@@ -1,10 +1,13 @@
 
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.14.5 (Umbrel 1.x compatible fork)
+#   Version  : 2.14.6 (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
-#    # v2.14.5: Added horizontal flip (pb[:, ::-1, :]) in image_to_data().
+#    # v2.14.6: Changed flip in image_to_data() from column flip ([:, ::-1, :])
+#           to row flip ([::-1, :, :]). After rotate(90 CCW), buffer rows =
+#           original columns, so row flip corrects the LR mirror correctly.
+#    # v2.14.5: Added horizontal flip (pb[:, ::-1, :]) in image_to_data() - wrong axis.
 #           rotate(90 CCW) + MADCTL=0x40 produces correct upright image
 #           but left-right mirrored. The flip corrects the LR mirror.
 #           All three axes now confirmed correct on hardware.
@@ -979,7 +982,7 @@ def draw_screen7():
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
-print('Running Umbrel LCD script - Version: 2.14.5 (Umbrel 1.x compatible)')
+print('Running Umbrel LCD script - Version: 2.14.6 (Umbrel 1.x compatible)')
 
 # Display umbrel logo on startup (duration configurable in config.ini)
 display_background_image('umbrel_logo.png')
