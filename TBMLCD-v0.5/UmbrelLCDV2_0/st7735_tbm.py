@@ -11,8 +11,8 @@
 #
 #   Hardware: TBM 1.8" 128×160 ST7735 panel
 #   - ST7735_COLS = 128, ST7735_ROWS = 160  (no offset needed)
-#   - MADCTL = 0x40 (MY=0, MX=1, MV=0, BGR order when bgr=True)
-#     Confirmed correct for TBM 1.8" panel in v2.10.0.
+#   - MADCTL = 0xC0 (MY=1, MX=1, MV=0, BGR order when bgr=True)
+#     v2.10.0 base (0x40, MX=1) + MY=1 to correct upside-down.
 #
 #   Display orientation pipeline:
 #   1. UmbrelLCD.py draws all content rotated 270° CCW onto a 128×160 buffer.
@@ -197,13 +197,14 @@ class ST7735(object):
 
         self.command(ST7735_INVON if self._invert else ST7735_INVOFF)
 
-        # MADCTL: MY=0, MX=1, MV=0
+        # MADCTL: MY=1, MX=1, MV=0
+        # MY=1 (bit 7) = row address bottom-to-top    (corrects upside-down)
         # MX=1 (bit 6) = column address right-to-left (corrects left-right mirror)
         # BGR bit (bit 3): 0 = BGR order, 1 = RGB order
-        # bgr=True  → 0x40 (MX=1, BGR) ← confirmed correct for TBM panel (v2.10.0)
-        # bgr=False → 0x48 (MX=1, RGB)
+        # bgr=True  → 0xC0 (MY=1, MX=1, BGR) ← v2.10.0 base (0x40) + MY fix
+        # bgr=False → 0xC8 (MY=1, MX=1, RGB)
         self.command(ST7735_MADCTL)
-        self.data(0x40 if self._bgr else 0x48)
+        self.data(0xC0 if self._bgr else 0xC8)
 
         self.command(ST7735_COLMOD)
         self.data(0x05)                 # 16-bit colour

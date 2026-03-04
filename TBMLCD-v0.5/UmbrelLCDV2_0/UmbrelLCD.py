@@ -1,9 +1,12 @@
 
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.14.1 (Umbrel 1.x compatible fork)
+#   Version  : 2.14.2 (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
+#    # v2.14.2: MADCTL 0x40 → 0xC0 (added MY=1 bit) to fix upside-down display.
+#           v2.14.1 confirmed colour/LR correct with 0x40; only UD was wrong.
+#           MY=1 flips row scan direction to correct the upside-down issue.
 #    # v2.14.1: Reverted MADCTL to 0x40 (MX=1, BGR) + no flip in image_to_data().
 #           This is the v2.10.0 combination confirmed working on hardware.
 #           All subsequent orientation attempts (0xC0, 0x00 + flip) were wrong.
@@ -966,7 +969,7 @@ def draw_screen7():
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
-print('Running Umbrel LCD script - Version: 2.14.1 (Umbrel 1.x compatible)')
+print('Running Umbrel LCD script - Version: 2.14.2 (Umbrel 1.x compatible)')
 
 # Display umbrel logo on startup (duration configurable in config.ini)
 display_background_image('umbrel_logo.png')
