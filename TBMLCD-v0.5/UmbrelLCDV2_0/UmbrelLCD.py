@@ -1,9 +1,18 @@
 
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.12.0 (Umbrel 1.x compatible fork)
+#   Version  : 2.13.0 (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
+#    # v2.13.0: Fixed display orientation (upside-down + left-right mirror)
+#           Root cause: software 270° rotation + MADCTL=0x00 (direct map)
+#           produces 180°-wrong output. Fix: added 180° flip in image_to_data()
+#           in st7735_tbm.py (pb[::-1, ::-1, :]) before RGB565 conversion.
+#           Net effect: 270° SW rotation + 180° HW flip = 90° correct portrait.
+#           Fixed text clipping: replaced draw.textbbox size calculation with
+#           make_text_image() that accounts for font descent/ascent offsets.
+#           Fixed setup script language selection (eval bug → case/if approach).
+#           Duration prompts now read actual defaults from config.ini.
 #    # v2.12.0: MADCTL 0xC0→0x00 (MY=0,MX=0,BGR) 화면 방향 수정 (상하+좌우 반전 해제)
 #           모든 화면 기본 전환 시간 10초로 변경, 설치 스크립트 다국어 지원 추가
 # v2.11.0: MADCTL 0x48→0xC0 (MY=1 추가) 상하반전 재수정, 설치 스크립트에서 화면 전환 시간 인터랙티브 설정 추가, 기본값 6초
@@ -283,6 +292,32 @@ def get_text_size(draw_obj, text, font):
         return draw_obj.textsize(text, font=font)
 
 
+def make_text_image(text, font, fill=(255, 255, 255)):
+    """Create a transparent RGBA image containing the rendered text.
+
+    Uses textbbox to account for font descent/ascent offsets so that
+    characters with descenders (g, p, y, …) are not clipped at the bottom.
+    """
+    # Measure with a temporary draw object
+    tmp = Image.new('RGBA', (1, 1))
+    tmp_draw = ImageDraw.Draw(tmp)
+    try:
+        bbox = tmp_draw.textbbox((0, 0), text, font=font)
+        x_off = -bbox[0]          # shift so left edge is at x=0
+        y_off = -bbox[1]          # shift so top edge is at y=0
+        w = bbox[2] - bbox[0]
+        h = bbox[3] - bbox[1]
+    except AttributeError:
+        # Pillow < 9 fallback
+        w, h = tmp_draw.textsize(text, font=font)
+        x_off, y_off = 0, 0
+    # Add a small margin to avoid clipping at the bottom
+    h_margin = max(4, int(h * 0.15))
+    img = Image.new('RGBA', (max(w, 1), max(h + h_margin, 1)), (0, 0, 0, 0))
+    ImageDraw.Draw(img).text((x_off, y_off), text, font=font, fill=fill)
+    return img
+
+
 # ---------------------------------------------------------------------------
 # Bitcoin RPC helper - direct HTTP + docker exec fallback
 # ---------------------------------------------------------------------------
@@ -388,34 +423,27 @@ def display_icon(image, image_path, position, icon_size):
 
 def draw_left_justified_text(image, text, xposition, yPosition,
                               angle, font, fill=(255, 255, 255)):
-    tmp_draw = ImageDraw.Draw(image)
-    width, height = get_text_size(tmp_draw, text, font=font)
-    textimage = Image.new('RGBA', (width, height), (0, 0, 0, 0))
-    ImageDraw.Draw(textimage).text((0, 0), text, font=font, fill=fill)
+    textimage = make_text_image(text, font, fill)
     rotated = textimage.rotate(angle, expand=1)
     image.paste(rotated, (xposition, yPosition), rotated)
 
 
 def draw_right_justified_text(image, text, xposition, yPosition,
                                angle, font, fill=(255, 255, 255)):
-    tmp_draw = ImageDraw.Draw(image)
-    width, height = get_text_size(tmp_draw, text, font=font)
-    textimage = Image.new('RGBA', (width, height), (0, 0, 0, 0))
-    ImageDraw.Draw(textimage).text((0, 0), text, font=font, fill=fill)
+    textimage = make_text_image(text, font, fill)
+    w, h = textimage.size
     rotated = textimage.rotate(angle, expand=1)
     H = 160
-    image.paste(rotated, (xposition, int((H - width) - yPosition)), rotated)
+    image.paste(rotated, (xposition, int((H - w) - yPosition)), rotated)
 
 
 def draw_centered_text(image, text, xposition, angle, font,
                        fill=(255, 255, 255)):
-    tmp_draw = ImageDraw.Draw(image)
-    width, height = get_text_size(tmp_draw, text, font=font)
-    textimage = Image.new('RGBA', (width, height), (0, 0, 0, 0))
-    ImageDraw.Draw(textimage).text((0, 0), text, font=font, fill=fill)
+    textimage = make_text_image(text, font, fill)
+    w, h = textimage.size
     rotated = textimage.rotate(angle, expand=1)
     H = 160
-    image.paste(rotated, (xposition, int((H - width) / 2)), rotated)
+    image.paste(rotated, (xposition, int((H - w) / 2)), rotated)
 
 
 def place_value(number):

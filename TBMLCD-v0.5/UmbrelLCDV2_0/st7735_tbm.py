@@ -74,11 +74,22 @@ ST7735_PWCTR6  = 0xFC
 
 
 def image_to_data(image):
-    """Convert a PIL image to 16-bit RGB565 bytes (no rotation applied).
-    The TBM drawing code already rotates elements 270 degrees before writing
-    to the screen buffer, so we send the buffer as-is.
+    """Convert a PIL image to 16-bit RGB565 bytes.
+
+    The TBM drawing code rotates every element 270° CCW before writing to the
+    128×160 portrait buffer.  With MADCTL=0x00 (MY=0, MX=0, direct mapping)
+    the buffer is displayed as-is, which results in the content appearing
+    upside-down + left-right mirrored (180° wrong).
+
+    Fix: rotate the buffer 180° here before converting to RGB565.  This is
+    equivalent to np.rot90(arr, 2) and costs negligible CPU time.
+    The net effect is that the 270° software rotation + this 180° correction
+    = 270+180 = 450 = 90° net rotation, which produces correct portrait output
+    with MADCTL=0x00.
     """
     pb = np.array(image.convert('RGB')).astype('uint16')
+    # Rotate 180°: flip both axes (equivalent to np.rot90(arr, 2))
+    pb = pb[::-1, ::-1, :]
     color = ((pb[:, :, 0] & 0xF8) << 8) | ((pb[:, :, 1] & 0xFC) << 3) | (pb[:, :, 2] >> 3)
     return np.dstack(((color >> 8) & 0xFF, color & 0xFF)).flatten().tolist()
 

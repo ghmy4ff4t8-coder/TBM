@@ -1,92 +1,18 @@
 #!/bin/bash
 #-------------------------------------------------------------------------------
 #   Copyright (c) DOIDO Technologies
-#   Version  : 1.3.0  (Umbrel 1.x compatible fork)
+#   Version  : 1.4.0  (Umbrel 1.x compatible fork)
 #   Changes  :
-#     v1.3.0: Added multi-language support (EN/KR) for interactive setup.
+#     v1.4.0: Fixed language selection (eval bug replaced with case/if approach).
+#             Duration prompts now read actual defaults from config.ini.
 #             Default screen durations changed to 10s.
+#     v1.3.0: Added multi-language support (EN/KR) for interactive setup.
 #     v1.2.0: Added interactive screen duration settings.
 #     v1.1.0: Fixed sudo echo redirect, added docker.service dependency.
 #-------------------------------------------------------------------------------
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Language Strings (i18n)
-# ──────────────────────────────────────────────────────────────────────────────
-
-# English (en)
-L_EN_BANNER="TBM (The Bitcoin Machine) - LCD Service Setup"
-L_EN_INTRO="This script will guide you through setting up the LCD service."
-L_EN_PROMPT_YN="Please answer with yes or no, then press Enter."
-L_EN_S1_DESC="Bitcoin price & sats/currency"
-L_EN_S2_DESC="Next block info"
-L_EN_S3_DESC="Block height"
-L_EN_S4_DESC="Date/Time"
-L_EN_S5_DESC="Network info"
-L_EN_S6_DESC="Lightning channels"
-L_EN_S7_DESC="Disk usage"
-L_EN_ASK_SCREEN="Display Screen %s (%s)? [yes/no]: "
-L_EN_ADDED="✔ Screen %s added."
-L_EN_SKIPPED="- Screen %s skipped."
-L_EN_INVALID_YN="Invalid input. Please enter yes or no."
-L_EN_SCREENS_SELECTED="Screens selected:"
-L_EN_CURRENCY_PROMPT="Please enter your currency code (e.g., USD, KRW, EUR, JPY): "
-L_EN_CURRENCY_VALID="✔ Currency set to: %s"
-L_EN_CURRENCY_INVALID="Invalid currency code. Please try again."
-L_EN_DURATION_HEADER="Screen Duration Setup (seconds)"
-L_EN_DURATION_INTRO="Enter the time in seconds for each screen to be displayed."
-L_EN_DURATION_DEFAULT="Press Enter to use the default value."
-L_EN_DUR_LOGO="Umberl logo at startup (default: 10s): "
-L_EN_DUR_S1="Bitcoin price screen (default: 10s): "
-L_EN_DUR_OTHER="All other screens (default: 10s): "
-L_EN_DUR_VALID="✔ %s duration: %ss"
-L_EN_INVALID_NUM="Please enter a positive integer."
-L_EN_CONFIG_GENERATED="✔ config.ini generated successfully."
-L_EN_SERVICE_CREATING="Creating LCD Service..."
-L_EN_SERVICE_DONE="✔ LCD Service setup complete!"
-L_EN_LOG_CMD="To check logs:"
-L_EN_STOP_CMD="To stop service:"
-L_EN_RESTART_CMD="To restart service:"
-L_EN_RERUN_CMD="To re-run setup:"
-L_EN_YES="YES"
-
-# Korean (ko)
-L_KO_BANNER="TBM (The Bitcoin Machine) - LCD 서비스 설정"
-L_KO_INTRO="이 스크립트는 LCD 서비스 설정을 안내합니다."
-L_KO_PROMPT_YN="각 질문에 yes 또는 no 로 답하고 Enter 를 누르세요."
-L_KO_S1_DESC="비트코인 가격"
-L_KO_S2_DESC="다음 블록 정보"
-L_KO_S3_DESC="블록 높이"
-L_KO_S4_DESC="날짜/시간"
-L_KO_S5_DESC="네트워크 정보"
-L_KO_S6_DESC="라이트닝 채널"
-L_KO_S7_DESC="디스크 용량"
-L_KO_ASK_SCREEN="화면 %s (%s) 을 표시할까요? [yes/no]: "
-L_KO_ADDED="✔ 화면 %s 추가됨."
-L_KO_SKIPPED="- 화면 %s 건너뜀."
-L_KO_INVALID_YN="잘못된 입력입니다. yes 또는 no 로 입력해주세요."
-L_KO_SCREENS_SELECTED="선택된 화면:"
-L_KO_CURRENCY_PROMPT="통화 코드를 입력하세요 (예: USD, KRW, EUR, JPY): "
-L_KO_CURRENCY_VALID="✔ 통화 설정: %s"
-L_KO_CURRENCY_INVALID="유효하지 않은 통화 코드입니다. 다시 시도해주세요."
-L_KO_DURATION_HEADER="화면 전환 시간 설정 (초)"
-L_KO_DURATION_INTRO="각 화면이 표시될 시간을 초 단위로 입력하세요."
-L_KO_DURATION_DEFAULT="Enter 키를 누르면 기본값이 적용됩니다."
-L_KO_DUR_LOGO="시작 로고 표시 시간 (기본값: 10초): "
-L_KO_DUR_S1="비트코인 가격 화면 표시 시간 (기본값: 10초): "
-L_KO_DUR_OTHER="나머지 모든 화면 표시 시간 (기본값: 10초): "
-L_KO_DUR_VALID="✔ %s 시간: %s초"
-L_KO_INVALID_NUM="양의 정수를 입력해주세요."
-L_KO_CONFIG_GENERATED="✔ config.ini 생성 완료."
-L_KO_SERVICE_CREATING="LCD 서비스 생성 중..."
-L_KO_SERVICE_DONE="✔ LCD 서비스 설정 완료!"
-L_KO_LOG_CMD="로그 확인:"
-L_KO_STOP_CMD="서비스 중지:"
-L_KO_RESTART_CMD="서비스 재시작:"
-L_KO_RERUN_CMD="설정 재실행:"
-L_KO_YES="YES"
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Language Selection
+# Language Selection  (must come BEFORE any other output)
 # ──────────────────────────────────────────────────────────────────────────────
 clear
 echo "======================================================================"
@@ -98,88 +24,192 @@ echo "  2. 한국어 (Korean)"
 echo
 
 while true; do
-    read -p "Enter the number for your language [1-2]: " lang_choice
-    case $lang_choice in
-        1) lang="EN"; break ;;
-        2) lang="KO"; break ;;
-        *) echo "Invalid selection. Please enter 1 or 2." ;;
+    read -p "Enter number / 번호 입력 [1-2]: " lang_choice
+    case "$lang_choice" in
+        1) LANG_CODE="EN"; break ;;
+        2) LANG_CODE="KO"; break ;;
+        *) echo "  Please enter 1 or 2 / 1 또는 2를 입력하세요." ;;
     esac
 done
 
-# Dynamically set language variables
-for i in $(compgen -v L_${lang}_); do
-    short_name=$(echo $i | sed "s/L_${lang}_//")
-    eval "L_$short_name=\"${!i}""
-done
+# ──────────────────────────────────────────────────────────────────────────────
+# Helper: get localised string
+# Usage: T "KEY"  →  echoes the string for the selected language
+# ──────────────────────────────────────────────────────────────────────────────
+T() {
+    local key="$1"
+    case "$LANG_CODE" in
+        EN)
+            case "$key" in
+                BANNER)            echo "TBM (The Bitcoin Machine) - LCD Service Setup" ;;
+                INTRO)             echo "This script will guide you through setting up the LCD service." ;;
+                PROMPT_YN)         echo "Please answer with yes or no, then press Enter." ;;
+                S1_DESC)           echo "Bitcoin price & sats/currency" ;;
+                S2_DESC)           echo "Next block info" ;;
+                S3_DESC)           echo "Block height" ;;
+                S4_DESC)           echo "Date/Time" ;;
+                S5_DESC)           echo "Network info" ;;
+                S6_DESC)           echo "Lightning channels" ;;
+                S7_DESC)           echo "Disk usage" ;;
+                ASK_SCREEN)        echo "Display Screen $2 ($3)? [yes/no]: " ;;
+                ADDED)             echo "✔ Screen $2 added." ;;
+                SKIPPED)           echo "- Screen $2 skipped." ;;
+                INVALID_YN)        echo "Invalid input. Please enter yes or no." ;;
+                SCREENS_SELECTED)  echo "Screens selected:" ;;
+                CURRENCY_PROMPT)   echo "Please enter your currency code (e.g., USD, KRW, EUR, JPY): " ;;
+                CURRENCY_VALID)    echo "✔ Currency set to: $2" ;;
+                CURRENCY_INVALID)  echo "Invalid currency code. Please try again." ;;
+                DURATION_HEADER)   echo "Screen Duration Setup (seconds)" ;;
+                DURATION_INTRO)    echo "Enter the time in seconds for each screen to be displayed." ;;
+                DURATION_DEFAULT)  echo "Press Enter to keep the current default value." ;;
+                DUR_LOGO)          echo "Umbrel logo at startup (current default: ${2}s): " ;;
+                DUR_S1)            echo "Bitcoin price screen (current default: ${2}s): " ;;
+                DUR_OTHER)         echo "All other screens (current default: ${2}s): " ;;
+                DUR_VALID)         echo "✔ $2 duration: ${3}s" ;;
+                INVALID_NUM)       echo "Please enter a positive integer." ;;
+                CONFIG_GENERATED)  echo "✔ config.ini generated successfully." ;;
+                SERVICE_CREATING)  echo "Creating LCD Service..." ;;
+                SERVICE_DONE)      echo "✔ LCD Service setup complete!" ;;
+                LOG_CMD)           echo "Check logs:" ;;
+                STOP_CMD)          echo "Stop service:" ;;
+                RESTART_CMD)       echo "Restart service:" ;;
+                RERUN_CMD)         echo "Re-run setup:" ;;
+                YES_WORD)          echo "YES" ;;
+            esac
+            ;;
+        KO)
+            case "$key" in
+                BANNER)            echo "TBM (The Bitcoin Machine) - LCD 서비스 설정" ;;
+                INTRO)             echo "이 스크립트는 LCD 서비스 설정을 안내합니다." ;;
+                PROMPT_YN)         echo "각 질문에 yes 또는 no 로 답하고 Enter 를 누르세요." ;;
+                S1_DESC)           echo "비트코인 가격" ;;
+                S2_DESC)           echo "다음 블록 정보" ;;
+                S3_DESC)           echo "블록 높이" ;;
+                S4_DESC)           echo "날짜/시간" ;;
+                S5_DESC)           echo "네트워크 정보" ;;
+                S6_DESC)           echo "라이트닝 채널" ;;
+                S7_DESC)           echo "디스크 용량" ;;
+                ASK_SCREEN)        echo "화면 $2 ($3) 을 표시할까요? [yes/no]: " ;;
+                ADDED)             echo "✔ 화면 $2 추가됨." ;;
+                SKIPPED)           echo "- 화면 $2 건너뜀." ;;
+                INVALID_YN)        echo "잘못된 입력입니다. yes 또는 no 로 입력해주세요." ;;
+                SCREENS_SELECTED)  echo "선택된 화면:" ;;
+                CURRENCY_PROMPT)   echo "통화 코드를 입력하세요 (예: USD, KRW, EUR, JPY): " ;;
+                CURRENCY_VALID)    echo "✔ 통화 설정: $2" ;;
+                CURRENCY_INVALID)  echo "유효하지 않은 통화 코드입니다. 다시 시도해주세요." ;;
+                DURATION_HEADER)   echo "화면 전환 시간 설정 (초)" ;;
+                DURATION_INTRO)    echo "각 화면이 표시될 시간을 초 단위로 입력하세요." ;;
+                DURATION_DEFAULT)  echo "Enter 키를 누르면 현재 기본값이 그대로 유지됩니다." ;;
+                DUR_LOGO)          echo "시작 로고 표시 시간 (현재 기본값: ${2}초): " ;;
+                DUR_S1)            echo "비트코인 가격 화면 표시 시간 (현재 기본값: ${2}초): " ;;
+                DUR_OTHER)         echo "나머지 모든 화면 표시 시간 (현재 기본값: ${2}초): " ;;
+                DUR_VALID)         echo "✔ $2 시간: ${3}초" ;;
+                INVALID_NUM)       echo "양의 정수를 입력해주세요." ;;
+                CONFIG_GENERATED)  echo "✔ config.ini 생성 완료." ;;
+                SERVICE_CREATING)  echo "LCD 서비스 생성 중..." ;;
+                SERVICE_DONE)      echo "✔ LCD 서비스 설정 완료!" ;;
+                LOG_CMD)           echo "로그 확인:" ;;
+                STOP_CMD)          echo "서비스 중지:" ;;
+                RESTART_CMD)       echo "서비스 재시작:" ;;
+                RERUN_CMD)         echo "설정 재실행:" ;;
+                YES_WORD)          echo "YES" ;;
+            esac
+            ;;
+    esac
+}
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Read current defaults from config.ini (if it exists)
+# ──────────────────────────────────────────────────────────────────────────────
+cwd=$(pwd)
+CONFIG_FILE="${cwd}/config.ini"
+
+read_config_value() {
+    local key="$1"
+    local fallback="$2"
+    if [ -f "$CONFIG_FILE" ]; then
+        local val
+        val=$(grep -E "^\s*${key}\s*=" "$CONFIG_FILE" | head -1 | sed 's/.*=\s*//' | tr -d '[:space:]')
+        if [ -n "$val" ]; then
+            echo "$val"
+            return
+        fi
+    fi
+    echo "$fallback"
+}
+
+DEFAULT_LOGO=$(read_config_value "logo_duration" "10")
+DEFAULT_S1=$(read_config_value "screen1_duration" "10")
+DEFAULT_OTHER=$(read_config_value "screen_duration" "10")
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Setup Start
 # ──────────────────────────────────────────────────────────────────────────────
 clear
 echo "======================================================================"
-printf " %s\n" "$L_BANNER"
+echo " $(T BANNER)"
 echo "======================================================================"
 echo
-printf " %s\n" "$L_INTRO"
-printf " %s\n\n" "$L_PROMPT_YN"
+echo " $(T INTRO)"
+echo " $(T PROMPT_YN)"
+echo
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Screen Selection
 # ──────────────────────────────────────────────────────────────────────────────
-echo "--- [ 1/3 ] Screen Selection ---"
+echo "--- [ 1/3 ] $(T SCREENS_SELECTED | sed 's/://' || echo 'Screen Selection') ---"
 echo
 
 userScreenChoices=""
+YES_WORD=$(T YES_WORD)
 
 ask_screen() {
-    local num=$1
-    local desc_var="L_S${num}_DESC"
-    local desc="${!desc_var}"
+    local num="$1"
+    local desc
+    desc=$(T "S${num}_DESC")
+    local prompt
+    prompt=$(T ASK_SCREEN "$num" "$desc")
     local gettingChoice=true
     while $gettingChoice; do
-        printf "$L_ASK_SCREEN" "$num" "$desc"
-        read -r ans
-        ans=${ans^^}
-        if [ "$ans" == "$L_YES" ]; then
-            printf "  \e[1;32m$L_ADDED\e[0m\n" "$num"
+        read -rp "$prompt" ans
+        ans="${ans^^}"
+        if [ "$ans" = "$YES_WORD" ]; then
+            echo -e "  \e[1;32m$(T ADDED "$num")\e[0m"
             userScreenChoices="${userScreenChoices}Screen${num},"
             gettingChoice=false
-        elif [ "$ans" == "NO" ]; then
-            printf "  $L_SKIPPED\n" "$num"
+        elif [ "$ans" = "NO" ]; then
+            echo "  $(T SKIPPED "$num")"
             gettingChoice=false
         else
-            printf "  \e[1;31m$L_INVALID_YN\e[0m\n"
+            echo -e "  \e[1;31m$(T INVALID_YN)\e[0m"
         fi
     done
 }
 
-ask_screen 1
-ask_screen 2
-ask_screen 3
-ask_screen 4
-ask_screen 5
-ask_screen 6
-ask_screen 7
+for n in 1 2 3 4 5 6 7; do
+    ask_screen "$n"
+done
 
 echo
-printf "$L_SCREENS_SELECTED %s\n\n" "$userScreenChoices"
+echo "$(T SCREENS_SELECTED) ${userScreenChoices}"
+echo
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Currency Selection
 # ──────────────────────────────────────────────────────────────────────────────
-echo "--- [ 2/3 ] Currency Selection ---"
+echo "--- [ 2/3 ] Currency ---"
 echo
 
 gettingCurrency=true
 while $gettingCurrency; do
-    read -p "$L_CURRENCY_PROMPT" newCurrency
-    newCurrency=${newCurrency^^}
+    read -rp "$(T CURRENCY_PROMPT)" newCurrency
+    newCurrency="${newCurrency^^}"
     validationResult=$(python3 ./CurrencyData.py "${newCurrency}")
     if [ "$validationResult" = "Valid" ]; then
-        printf "  \e[1;32m$L_CURRENCY_VALID\e[0m\n" "$newCurrency"
+        echo -e "  \e[1;32m$(T CURRENCY_VALID "$newCurrency")\e[0m"
         gettingCurrency=false
     else
-        printf "  \e[1;31m$L_CURRENCY_INVALID\e[0m\n"
+        echo -e "  \e[1;31m$(T CURRENCY_INVALID)\e[0m"
     fi
 done
 echo
@@ -187,39 +217,39 @@ echo
 # ──────────────────────────────────────────────────────────────────────────────
 # Duration Setup
 # ──────────────────────────────────────────────────────────────────────────────
-echo "--- [ 3/3 ] $L_DURATION_HEADER ---"
+echo "--- [ 3/3 ] $(T DURATION_HEADER) ---"
 echo
-printf "%s\n" "$L_DURATION_INTRO"
-printf "%s\n\n" "$L_DURATION_DEFAULT"
+echo "$(T DURATION_INTRO)"
+echo "$(T DURATION_DEFAULT)"
+echo
 
 ask_duration() {
-    local prompt_var=$1
-    local default_val=$2
-    local name=$3
-    local duration_val
+    local prompt="$1"
+    local default_val="$2"
+    local name="$3"
+    local result_var="$4"
+    local val
     while true; do
-        read -p "$prompt_var" duration_val
-        duration_val=${duration_val:-$default_val}
-        if [[ "$duration_val" =~ ^[0-9]+$ ]] && [ "$duration_val" -gt 0 ]; then
-            printf "  \e[1;32m$L_DUR_VALID\e[0m\n" "$name" "$duration_val"
-            echo "$duration_val"
+        read -rp "$prompt" val
+        val="${val:-$default_val}"
+        if [[ "$val" =~ ^[0-9]+$ ]] && [ "$val" -gt 0 ]; then
+            echo -e "  \e[1;32m$(T DUR_VALID "$name" "$val")\e[0m"
+            eval "$result_var=$val"
             break
         else
-            printf "  \e[1;31m$L_INVALID_NUM\e[0m\n"
+            echo -e "  \e[1;31m$(T INVALID_NUM)\e[0m"
         fi
     done
 }
 
-logoDuration=$(ask_duration "$L_DUR_LOGO" 10 "Logo")
-screen1Duration=$(ask_duration "$L_DUR_S1" 10 "Price screen")
-screenDuration=$(ask_duration "$L_DUR_OTHER" 10 "Other screens")
+ask_duration "$(T DUR_LOGO "$DEFAULT_LOGO")" "$DEFAULT_LOGO" "Logo" logoDuration
+ask_duration "$(T DUR_S1 "$DEFAULT_S1")" "$DEFAULT_S1" "Price" screen1Duration
+ask_duration "$(T DUR_OTHER "$DEFAULT_OTHER")" "$DEFAULT_OTHER" "Other" screenDuration
 echo
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Generate config.ini
 # ──────────────────────────────────────────────────────────────────────────────
-cwd=$(pwd)
-
 cat > "${cwd}/config.ini" << CONFIGEOF
 # TBM LCD Configuration File (auto-generated by setup script)
 # To apply changes, restart the service: sudo systemctl restart UmbrelST7735LCD
@@ -237,13 +267,14 @@ screen_duration  = ${screenDuration}
 # container = lightning_lnd_1
 CONFIGEOF
 
-printf "\e[1;32m%s\e[0m\n\n" "$L_CONFIG_GENERATED"
+echo -e "\e[1;32m$(T CONFIG_GENERATED)\e[0m"
+echo
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Create systemd Service
 # ──────────────────────────────────────────────────────────────────────────────
 echo "======================================================================"
-printf " %s\n" "$L_SERVICE_CREATING"
+echo " $(T SERVICE_CREATING)"
 echo "======================================================================"
 echo
 
@@ -258,7 +289,7 @@ Restart=on-failure
 RestartSec=30s
 Type=idle
 Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-ExecStart=/usr/bin/python3 $cwd/UmbrelLCD.py $newCurrency $userScreenChoices
+ExecStart=/usr/bin/python3 ${cwd}/UmbrelLCD.py ${newCurrency} ${userScreenChoices}
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=UmbrelST7735LCD
@@ -273,10 +304,10 @@ sudo systemctl enable UmbrelST7735LCD.service
 sudo systemctl start UmbrelST7735LCD.service
 
 echo
-echo -e "\e[1;32m$L_SERVICE_DONE\e[0m"
+echo -e "\e[1;32m$(T SERVICE_DONE)\e[0m"
 echo
-printf "  %-20s sudo journalctl -u UmbrelST7735LCD -f\n" "$L_LOG_CMD"
-printf "  %-20s sudo systemctl stop UmbrelST7735LCD\n" "$L_STOP_CMD"
-printf "  %-20s sudo systemctl restart UmbrelST7735LCD\n" "$L_RESTART_CMD"
-printf "  %-20s 'sudo systemctl stop UmbrelST7735LCD && ./umbrelLCDServiceSetup.sh'\n" "$L_RERUN_CMD"
+printf "  %-22s sudo journalctl -u UmbrelST7735LCD -f\n"                                      "$(T LOG_CMD)"
+printf "  %-22s sudo systemctl stop UmbrelST7735LCD\n"                                         "$(T STOP_CMD)"
+printf "  %-22s sudo systemctl restart UmbrelST7735LCD\n"                                      "$(T RESTART_CMD)"
+printf "  %-22s sudo systemctl stop UmbrelST7735LCD && bash umbrelLCDServiceSetup.sh\n"        "$(T RERUN_CMD)"
 echo
