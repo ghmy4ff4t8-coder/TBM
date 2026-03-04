@@ -1,9 +1,21 @@
 
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.8.0  (Umbrel 1.x compatible fork)
+#   Version  : 2.9.0  (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
+#     v2.9.0 (2024-03):
+#       - FIXED: LCD 180-degree rotation - MADCTL changed from 0xC8 (MY=1,MX=1)
+#         to 0x08 (MY=0,MX=0). Photos confirmed image was upside-down+mirrored.
+#       - IMPROVED: Data layer resilience against Umbrel updates:
+#         * RPC credentials (user/pass/host/port) now read from config.ini,
+#           so future Umbrel credential changes only need config.ini edit.
+#         * Container names read from config.ini with hardcoded fallback list.
+#         * get_block_count: local RPC → mempool.space → blockchain.info
+#         * get_btc_price: CoinGecko → Coinbase → Kraken (3 independent APIs)
+#         * mempool data: local Umbrel mempool → public mempool.space
+#         * Removed Tor dependency from price/block APIs (direct HTTPS instead)
+#
 #     v2.8.0 (2024-03):
 #       - FIXED: gpiod 2.x API compatibility in st7735_tbm.py.
 #         gpiod 2.0 removed the entire 1.x API (get_line, LINE_REQ_DIR_OUT).
@@ -200,25 +212,39 @@ mempool_url = "https://mempool.space"
 # Mainnet or testnet settings
 blockchain_type = "mainnet"
 
-# Bitcoin RPC credentials (Umbrel defaults)
-BITCOIN_RPC_USER = "umbrel"
-BITCOIN_RPC_PASS = "moneyprintergobrrr"
-BITCOIN_RPC_HOST = "127.0.0.1"
-BITCOIN_RPC_PORT = 8332
+# ---------------------------------------------------------------------------
+# Bitcoin / LND connection settings
+# ---------------------------------------------------------------------------
+# These are read from config.ini if present, otherwise fall back to defaults.
+# This means future Umbrel updates that change RPC credentials only require
+# editing config.ini — no code changes needed.
+# ---------------------------------------------------------------------------
+_cfg = configparser.ConfigParser()
+_cfg.read(os.path.join(basedir, 'config.ini'))
 
-# Bitcoin container names to try (Umbrel 1.x uses these)
+BITCOIN_RPC_USER = _cfg.get('BITCOIN', 'rpc_user', fallback='umbrel')
+BITCOIN_RPC_PASS = _cfg.get('BITCOIN', 'rpc_pass', fallback='moneyprintergobrrr')
+BITCOIN_RPC_HOST = _cfg.get('BITCOIN', 'rpc_host', fallback='127.0.0.1')
+BITCOIN_RPC_PORT = int(_cfg.get('BITCOIN', 'rpc_port', fallback='8332'))
+
+# Bitcoin container names to try in order (Umbrel may rename containers across versions)
+# Add new names here if Umbrel changes container naming in a future update.
 BITCOIN_CONTAINER_NAMES = [
-    "bitcoin_bitcoind_1",
-    "bitcoin-bitcoind-1",
-    "bitcoind",
+    _cfg.get('BITCOIN', 'container', fallback=''),   # user override in config.ini
+    "bitcoin_bitcoind_1",    # Umbrel 0.x / 1.x docker-compose style
+    "bitcoin-bitcoind-1",   # Umbrel 1.x alternative
+    "bitcoind",             # generic fallback
 ]
+BITCOIN_CONTAINER_NAMES = [n for n in BITCOIN_CONTAINER_NAMES if n]  # remove empty
 
-# LND container names to try
+# LND container names to try in order
 LND_CONTAINER_NAMES = [
-    "lightning_lnd_1",
-    "lightning-lnd-1",
-    "lnd",
+    _cfg.get('LIGHTNING', 'container', fallback=''),  # user override
+    "lightning_lnd_1",      # Umbrel 0.x / 1.x
+    "lightning-lnd-1",     # Umbrel 1.x alternative
+    "lnd",                  # generic fallback
 ]
+LND_CONTAINER_NAMES = [n for n in LND_CONTAINER_NAMES if n]  # remove empty
 
 
 # ---------------------------------------------------------------------------
@@ -377,6 +403,21 @@ def place_value(number):
 # Data-fetching helpers
 # ---------------------------------------------------------------------------
 def get_block_count():
+    # Priority 1: local Bitcoin node RPC (most reliable, no external dependency)
+    try:
+        chain = "test" if blockchain_type == "test" else "main"
+        count = bitcoin_rpc("getblockcount", chain=chain)
+        return str(count)
+    except Exception:
+        pass
+    # Priority 2: public mempool.space API (works even if local node is down)
+    try:
+        url = mempool_url + "/api/blocks/tip/height"
+        r = requests.get(url, timeout=10)
+        return r.text.strip()
+    except Exception:
+        pass
+    # Priority 3: blockchain.info (last resort)
     try:
         url = "https://blockchain.info/q/getblockcount"
         return tor_request(url).text
@@ -386,47 +427,73 @@ def get_block_count():
 
 
 def get_btc_price(currency):
+    # Priority 1: CoinGecko (most comprehensive)
     try:
         url = ("https://api.coingecko.com/api/v3/simple/price"
                "?ids=bitcoin&vs_currencies=" + currency)
-        data = json.loads(tor_request(url).text)
+        data = requests.get(url, timeout=10).json()
         return int(data['bitcoin'][currency.lower()])
     except Exception as err:
         print("Error getting price from CoinGecko:", str(err))
+    # Priority 2: Coinbase
+    try:
+        url = f"https://api.coinbase.com/v2/prices/BTC-{currency}/spot"
+        data = requests.get(url, timeout=10).json()
+        return int(float(data['data']['amount']))
+    except Exception as err2:
+        print("Error getting price from Coinbase:", str(err2))
+    # Priority 3: Kraken
+    try:
+        pair = f"XBT{currency.upper()}"
+        url = f"https://api.kraken.com/0/public/Ticker?pair={pair}"
+        data = requests.get(url, timeout=10).json()
+        result = list(data['result'].values())[0]
+        return int(float(result['c'][0]))
+    except Exception as err3:
+        print("Error getting price from Kraken:", str(err3))
+    return ""
+
+
+def _mempool_get(path):
+    """GET from local mempool first, fall back to mempool.space public API."""
+    for base in [mempool_url, "https://mempool.space"]:
         try:
-            url = f"https://api.coinbase.com/v2/prices/BTC-{currency}/spot"
-            data = requests.get(url, timeout=10).json()
-            return int(float(data['data']['amount']))
-        except Exception as err2:
-            print("Error getting price from Coinbase:", str(err2))
-            return ""
+            r = requests.get(base + path, timeout=10)
+            if r.ok:
+                return r
+        except Exception:
+            continue
+    return None
 
 
 def get_recommended_fees():
     try:
-        url = mempool_url + "/api/v1/fees/recommended"
-        return json.loads(tor_request(url).text)
+        r = _mempool_get("/api/v1/fees/recommended")
+        if r:
+            return r.json()
     except Exception as e:
         print("Error getting recommended fees;", str(e))
-        return ""
+    return ""
 
 
 def get_next_block_info():
     try:
-        url = mempool_url + "/api/v1/fees/mempool-blocks"
-        return json.loads(tor_request(url).text)[0]
+        r = _mempool_get("/api/v1/fees/mempool-blocks")
+        if r:
+            return r.json()[0]
     except Exception as e:
         print("Error getting next block info;", str(e))
-        return ""
+    return ""
 
 
 def get_unconfirmed_txs():
     try:
-        url = mempool_url + "/api/mempool"
-        return str(json.loads(tor_request(url).text)['count'])
+        r = _mempool_get("/api/mempool")
+        if r:
+            return str(r.json()['count'])
     except Exception as e:
         print("Error getting unconfirmed txs;", str(e))
-        return ""
+    return ""
 
 
 def classify_bytes(num_of_bytes):
@@ -874,7 +941,7 @@ def draw_screen7():
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
-print('Running Umbrel LCD script Version 2.8.0 (Umbrel 1.x compatible)')
+print('Running Umbrel LCD script Version 2.9.0 (Umbrel 1.x compatible)')
 
 # Display umbrel logo for 60 seconds on startup
 display_background_image('umbrel_logo.png')

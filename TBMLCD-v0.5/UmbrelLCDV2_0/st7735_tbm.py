@@ -251,12 +251,18 @@ class ST7735(object):
         else:
             self.command(ST7735_INVOFF)
 
-        # MADCTL = 0xC8: MX=1, MY=1, MV=0, ML=0, RGB=0(RGB order), MH=0
-        # This is the value used by the original doido-technologies library
-        # with rgb=True. It sets the scan direction so that the 128x160 buffer
-        # maps correctly to the physical TBM panel orientation.
+        # MADCTL register controls scan direction:
+        #   Bit 7 (MY)  = Row address order    (1=bottom-to-top)
+        #   Bit 6 (MX)  = Column address order (1=right-to-left)
+        #   Bit 5 (MV)  = Row/Column exchange
+        #   Bit 3 (RGB) = 0=RGB order, 1=BGR order
+        #
+        # Original doido-technologies used 0xC8 (MY=1, MX=1, RGB=0).
+        # Photos show the image is 180 degrees rotated (upside-down + mirrored).
+        # MY=1, MX=1 means both axes are flipped → 180° rotation.
+        # Setting MY=0, MX=0 (0x08) corrects the orientation.
         self.command(ST7735_MADCTL)
-        self.data(0xC8)
+        self.data(0x08)
 
         self.command(ST7735_COLMOD)     # 16-bit colour
         self.data(0x05)
