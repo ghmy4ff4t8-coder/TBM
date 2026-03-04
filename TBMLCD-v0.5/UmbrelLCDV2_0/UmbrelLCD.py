@@ -1,9 +1,11 @@
 
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.13.0 (Umbrel 1.x compatible fork)
+#   Version  : 2.13.1 (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
+#    # v2.13.1: Changed image_to_data() flip from 180° (pb[::-1,::-1,:]) to
+#           vertical-only flip (pb[::-1,:,:]) to test upside-down correction only.
 #    # v2.13.0: Fixed display orientation (upside-down + left-right mirror)
 #           Root cause: software 270° rotation + MADCTL=0x00 (direct map)
 #           produces 180°-wrong output. Fix: added 180° flip in image_to_data()

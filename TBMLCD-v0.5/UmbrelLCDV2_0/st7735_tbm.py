@@ -81,15 +81,13 @@ def image_to_data(image):
     the buffer is displayed as-is, which results in the content appearing
     upside-down + left-right mirrored (180° wrong).
 
-    Fix: rotate the buffer 180° here before converting to RGB565.  This is
-    equivalent to np.rot90(arr, 2) and costs negligible CPU time.
-    The net effect is that the 270° software rotation + this 180° correction
-    = 270+180 = 450 = 90° net rotation, which produces correct portrait output
-    with MADCTL=0x00.
+    Fix: flip the buffer vertically (top↔bottom) before converting to RGB565.
+    This corrects the upside-down display caused by the 270° software rotation
+    combined with MADCTL=0x00 (direct mapping).
     """
     pb = np.array(image.convert('RGB')).astype('uint16')
-    # Rotate 180°: flip both axes (equivalent to np.rot90(arr, 2))
-    pb = pb[::-1, ::-1, :]
+    # Flip top↔bottom only
+    pb = pb[::-1, :, :]
     color = ((pb[:, :, 0] & 0xF8) << 8) | ((pb[:, :, 1] & 0xFC) << 3) | (pb[:, :, 2] >> 3)
     return np.dstack(((color >> 8) & 0xFF, color & 0xFF)).flatten().tolist()
 
