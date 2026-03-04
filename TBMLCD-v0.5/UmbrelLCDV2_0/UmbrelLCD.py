@@ -1,9 +1,14 @@
 
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.13.1 (Umbrel 1.x compatible fork)
+#   Version  : 2.14.0 (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
+#    # v2.14.0: Code cleanup: removed unused imports (numpy, certifi, ssl, urlreq,
+#           socket), merged duplicate config reader (load_config → _cfg),
+#           removed unused get_text_size(), cleaned up st7735_tbm.py
+#           (batched data() calls, removed duplicate register constants,
+#           clarified orientation pipeline in comments).
 #    # v2.13.1: Changed image_to_data() flip from 180° (pb[::-1,::-1,:]) to
 #           vertical-only flip (pb[::-1,:,:]) to test upside-down correction only.
 #    # v2.13.0: Fixed display orientation (upside-down + left-right mirror)
@@ -137,35 +142,21 @@
 #       each.
 #-------------------------------------------------------------------------------
 
-from PIL import Image
-from PIL import ImageDraw
-from PIL import ImageFont
+from PIL import Image, ImageDraw, ImageFont
 import time
 import datetime
-import numpy as np
-
-# ---------------------------------------------------------------------------
-# Use the bundled st7735_tbm driver instead of pimoroni/st7735-python.
-# This driver is a direct port of the doido-technologies original library
-# (v0.0.4.doidotech) with RPi.GPIO replaced by gpiod + spidev.
-# It uses the correct MADCTL=0xC8, offset_left=0, offset_top=0 values
-# for the TBM 1.8" 128x160 panel.
-# ---------------------------------------------------------------------------
-from st7735_tbm import ST7735
-
-import urllib.request as urlreq
-import certifi
-import ssl
 import json
-import socket
 import pathlib
 import subprocess
 import sys
-from connections import test_tor, tor_request
 import os
-basedir = os.path.abspath(os.path.dirname(__file__))
 import configparser
 import requests
+
+from st7735_tbm import ST7735
+from connections import test_tor, tor_request
+
+basedir = os.path.abspath(os.path.dirname(__file__))
 
 WIDTH = 128
 HEIGHT = 160
@@ -282,17 +273,8 @@ LND_CONTAINER_NAMES = [n for n in LND_CONTAINER_NAMES if n]  # remove empty
 
 
 # ---------------------------------------------------------------------------
-# Pillow compatibility helper
-# Pillow 10.0.0 removed draw.textsize(). Use draw.textbbox() instead.
+# Pillow text rendering helper
 # ---------------------------------------------------------------------------
-def get_text_size(draw_obj, text, font):
-    """Returns (width, height) of the rendered text. Pillow 10+ compatible."""
-    try:
-        bbox = draw_obj.textbbox((0, 0), text, font=font)
-        return bbox[2] - bbox[0], bbox[3] - bbox[1]
-    except AttributeError:
-        return draw_obj.textsize(text, font=font)
-
 
 def make_text_image(text, font, fill=(255, 255, 255)):
     """Create a transparent RGBA image containing the rendered text.
@@ -696,22 +678,9 @@ def get_tor_status():
         return False
 
 
-def load_config(quiet=False):
-    config_file = os.path.join(basedir, 'config.ini')
-    CONFIG = configparser.ConfigParser()
-    if quiet:
-        CONFIG.read(config_file)
-        return CONFIG
-    if os.path.isfile(config_file):
-        CONFIG.read(config_file)
-        return CONFIG
-    print("LCD app requires config.ini to run")
-
-
 def check_umbrel_and_mempool():
-    config = load_config(True)
     try:
-        url = config['UMBREL']['url']
+        url = _cfg.get('UMBREL', 'url', fallback='http://umbrel.local/')
     except Exception:
         url = 'http://umbrel.local/'
 
@@ -994,7 +963,7 @@ def draw_screen7():
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
-print('Running Umbrel LCD script - Version: 2.12.0 (Umbrel 1.x compatible)')
+print('Running Umbrel LCD script - Version: 2.14.0 (Umbrel 1.x compatible)')
 
 # Display umbrel logo on startup (duration configurable in config.ini)
 display_background_image('umbrel_logo.png')

@@ -8,18 +8,19 @@
 #   - Replaced RPi.GPIO with gpiod 2.x API (Linux GPIO character device)
 #   - Replaced RPi.GPIO SPI with spidev direct calls
 #   - Removed all pimoroni/st7735-python dependencies
-#   - Kept original MADCTL=0xC8, ST7735_COLS=128, ST7735_ROWS=160
-#     (doido-technologies values, NOT pimoroni's 132x162)
 #
-#   gpiod 2.x API changes (gpiod >= 2.0):
-#   - chip.get_line() + line.request() REMOVED
-#   - New API: chip.request_lines(config={offset: LineSettings(...)}, ...)
-#   - set_value() now takes gpiod.line.Value.ACTIVE / INACTIVE
+#   Hardware: TBM 1.8" 128×160 ST7735 panel
+#   - ST7735_COLS = 128, ST7735_ROWS = 160  (no offset needed)
+#   - MADCTL = 0x00 (MY=0, MX=0, MV=0, BGR order when bgr=True)
 #
-#   Key hardware parameters for TBM 1.8" 128x160 ST7735 panel:
-#   - offset_left = 0  (ST7735_COLS=128, panel width=128, no offset needed)
-#   - offset_top  = 0  (ST7735_ROWS=160, panel height=160, no offset needed)
-#   - MADCTL = 0xC8    (MX=1, MY=1, MV=0, RGB mode)
+#   Display orientation pipeline:
+#   1. UmbrelLCD.py draws all content rotated 270° CCW onto a 128×160 buffer.
+#   2. image_to_data() flips the buffer vertically (top↔bottom) before
+#      converting to RGB565.  This corrects the upside-down output that would
+#      otherwise result from the 270° software rotation with MADCTL=0x00.
+#   3. The corrected RGB565 data is sent to the LCD via SPI.
+#
+#   Net transform: 270° CCW rotation + vertical flip = correct portrait.
 # -------------------------------------------------------------------------------
 
 import numbers
@@ -28,7 +29,9 @@ import numpy as np
 import spidev
 import gpiod
 
+# ---------------------------------------------------------------------------
 # ST7735 register constants
+# ---------------------------------------------------------------------------
 ST7735_TFTWIDTH  = 128
 ST7735_TFTHEIGHT = 160
 ST7735_COLS      = 128
@@ -36,152 +39,103 @@ ST7735_ROWS      = 160
 
 ST7735_NOP     = 0x00
 ST7735_SWRESET = 0x01
-ST7735_RDDID   = 0x04
-ST7735_RDDST   = 0x09
-ST7735_SLPIN   = 0x10
 ST7735_SLPOUT  = 0x11
-ST7735_PTLON   = 0x12
 ST7735_NORON   = 0x13
 ST7735_INVOFF  = 0x20
 ST7735_INVON   = 0x21
-ST7735_DISPOFF = 0x28
 ST7735_DISPON  = 0x29
 ST7735_CASET   = 0x2A
 ST7735_RASET   = 0x2B
 ST7735_RAMWR   = 0x2C
-ST7735_RAMRD   = 0x2E
-ST7735_PTLAR   = 0x30
 ST7735_MADCTL  = 0x36
 ST7735_COLMOD  = 0x3A
 ST7735_FRMCTR1 = 0xB1
 ST7735_FRMCTR2 = 0xB2
 ST7735_FRMCTR3 = 0xB3
 ST7735_INVCTR  = 0xB4
-ST7735_DISSET5 = 0xB6
 ST7735_PWCTR1  = 0xC0
 ST7735_PWCTR2  = 0xC1
-ST7735_PWCTR3  = 0xC2
 ST7735_PWCTR4  = 0xC3
 ST7735_PWCTR5  = 0xC4
 ST7735_VMCTR1  = 0xC5
-ST7735_RDID1   = 0xDA
-ST7735_RDID2   = 0xDB
-ST7735_RDID3   = 0xDC
-ST7735_RDID4   = 0xDD
 ST7735_GMCTRP1 = 0xE0
 ST7735_GMCTRN1 = 0xE1
-ST7735_PWCTR6  = 0xFC
 
 
 def image_to_data(image):
-    """Convert a PIL image to 16-bit RGB565 bytes.
+    """Convert a PIL Image to a flat list of 16-bit RGB565 bytes.
 
-    The TBM drawing code rotates every element 270° CCW before writing to the
-    128×160 portrait buffer.  With MADCTL=0x00 (MY=0, MX=0, direct mapping)
-    the buffer is displayed as-is, which results in the content appearing
-    upside-down + left-right mirrored (180° wrong).
-
-    Fix: flip the buffer vertically (top↔bottom) before converting to RGB565.
-    This corrects the upside-down display caused by the 270° software rotation
-    combined with MADCTL=0x00 (direct mapping).
+    Applies a vertical flip (top↔bottom) before conversion so that the
+    270° CCW software rotation used by UmbrelLCD.py produces the correct
+    portrait orientation on screen.
     """
     pb = np.array(image.convert('RGB')).astype('uint16')
-    # Flip top↔bottom only
-    pb = pb[::-1, :, :]
-    color = ((pb[:, :, 0] & 0xF8) << 8) | ((pb[:, :, 1] & 0xFC) << 3) | (pb[:, :, 2] >> 3)
+    pb = pb[::-1, :, :]          # vertical flip: correct for 270° SW rotation
+    color = ((pb[:, :, 0] & 0xF8) << 8) | \
+            ((pb[:, :, 1] & 0xFC) << 3) | \
+             (pb[:, :, 2] >> 3)
     return np.dstack(((color >> 8) & 0xFF, color & 0xFF)).flatten().tolist()
 
 
 class ST7735(object):
-    """ST7735 TFT LCD driver using spidev + gpiod (no RPi.GPIO dependency)."""
+    """ST7735 TFT LCD driver using spidev + gpiod 2.x (no RPi.GPIO)."""
 
     def __init__(self, port, cs, dc, rst=None,
                  width=ST7735_TFTWIDTH, height=ST7735_TFTHEIGHT,
                  offset_left=None, offset_top=None,
                  invert=False, bgr=False, spi_speed_hz=16000000):
-        """Initialise the ST7735 display.
-
-        :param port:         SPI port number (e.g. 0)
-        :param cs:           SPI chip-select number (e.g. 0)
-        :param dc:           GPIO pin number (BCM) for Data/Command
-        :param rst:          GPIO pin number (BCM) for Reset (optional)
-        :param width:        Display width in pixels
-        :param height:       Display height in pixels
-        :param offset_left:  Column offset in ST7735 RAM
-        :param offset_top:   Row offset in ST7735 RAM
-        :param invert:       Invert display colours
-        :param bgr:          True if panel uses BGR colour order (fixes blue icons)
-        :param spi_speed_hz: SPI clock speed in Hz
-        """
         self._width  = width
         self._height = height
         self._invert = invert
         self._bgr    = bgr
         self._dc_pin = dc
         self._rst_pin = rst
-
-        # Offsets: doido-technologies uses COLS=128, ROWS=160 (same as panel)
-        # so default offset is 0 for both axes.
         self._offset_left = offset_left if offset_left is not None else (ST7735_COLS - width) // 2
         self._offset_top  = offset_top  if offset_top  is not None else (ST7735_ROWS - height) // 2
 
-        # --- SPI setup ---
+        # SPI setup
         self._spi = spidev.SpiDev(port, cs)
         self._spi.mode = 0
         self._spi.lsbfirst = False
         self._spi.max_speed_hz = spi_speed_hz
 
-        # --- GPIO setup via gpiod 2.x API ---
-        # gpiod 2.x completely replaced the 1.x API:
-        #   OLD (1.x): chip.get_line(n) + line.request(type=LINE_REQ_DIR_OUT)
-        #   NEW (2.x): chip.request_lines(config={n: LineSettings(direction=Direction.OUTPUT)})
-        #
-        # Try gpiochip0 first (Pi 4), fall back to gpiochip4 (Pi 5)
+        # GPIO setup via gpiod 2.x
+        # Try gpiochip0 (Pi 4), gpiochip4 (Pi 5), gpiochip1 as fallback
         self._gpio_chip = None
         for chip_path in ('/dev/gpiochip0', '/dev/gpiochip4', '/dev/gpiochip1'):
             try:
-                chip = gpiod.Chip(chip_path)
-                self._gpio_chip = chip
-                self._gpio_chip_path = chip_path
+                self._gpio_chip = gpiod.Chip(chip_path)
                 break
             except Exception:
                 continue
         if self._gpio_chip is None:
             raise RuntimeError('Cannot open any gpiochip device. Is gpiod installed?')
 
-        # Build pin config dict for gpiod 2.x request_lines()
-        dc_settings = gpiod.LineSettings(
-            direction=gpiod.line.Direction.OUTPUT,
-            output_value=gpiod.line.Value.INACTIVE
-        )
-        pin_config = {dc: dc_settings}
-
-        if rst is not None:
-            rst_settings = gpiod.LineSettings(
+        pin_config = {
+            dc: gpiod.LineSettings(
                 direction=gpiod.line.Direction.OUTPUT,
-                output_value=gpiod.line.Value.ACTIVE
-            )
-            pin_config[rst] = rst_settings
+                output_value=gpiod.line.Value.INACTIVE)
+        }
+        if rst is not None:
+            pin_config[rst] = gpiod.LineSettings(
+                direction=gpiod.line.Direction.OUTPUT,
+                output_value=gpiod.line.Value.ACTIVE)
 
         self._gpio_request = self._gpio_chip.request_lines(
-            config=pin_config,
-            consumer='st7735-tbm'
-        )
+            config=pin_config, consumer='st7735-tbm')
 
         self.reset()
         self._init()
 
     def _set_dc(self, value):
-        # gpiod 2.x uses gpiod.line.Value enum instead of integers
         v = gpiod.line.Value.ACTIVE if value else gpiod.line.Value.INACTIVE
         self._gpio_request.set_value(self._dc_pin, v)
 
     def send(self, data, is_data=True, chunk_size=4096):
-        """Write bytes to the display. is_data=True for pixel data, False for commands."""
+        """Write bytes to the display."""
         self._set_dc(1 if is_data else 0)
         if isinstance(data, numbers.Number):
             data = [data & 0xFF]
-        # spidev xfer3 handles large transfers; chunk if needed
         for i in range(0, len(data), chunk_size):
             self._spi.xfer3(data[i:i + chunk_size])
 
@@ -206,140 +160,59 @@ class ST7735(object):
         pass
 
     def _init(self):
-        """Send the ST7735 initialisation command sequence.
-        This is identical to the doido-technologies original, which is known
-        to work correctly with the TBM 1.8" 128x160 panel.
-        """
-        self.command(ST7735_SWRESET)    # Software reset
+        """ST7735 initialisation sequence (doido-technologies original)."""
+        self.command(ST7735_SWRESET)
         time.sleep(0.150)
 
-        self.command(ST7735_SLPOUT)     # Out of sleep mode
+        self.command(ST7735_SLPOUT)
         time.sleep(0.500)
 
-        self.command(ST7735_FRMCTR1)    # Frame rate ctrl - normal mode
-        self.data(0x01)
-        self.data(0x2C)
-        self.data(0x2D)
+        self.command(ST7735_FRMCTR1)    # Frame rate - normal mode
+        self.data([0x01, 0x2C, 0x2D])
 
-        self.command(ST7735_FRMCTR2)    # Frame rate ctrl - idle mode
-        self.data(0x01)
-        self.data(0x2C)
-        self.data(0x2D)
+        self.command(ST7735_FRMCTR2)    # Frame rate - idle mode
+        self.data([0x01, 0x2C, 0x2D])
 
-        self.command(ST7735_FRMCTR3)    # Frame rate ctrl - partial mode
-        self.data(0x01)
-        self.data(0x2C)
-        self.data(0x2D)
-        self.data(0x01)
-        self.data(0x2C)
-        self.data(0x2D)
+        self.command(ST7735_FRMCTR3)    # Frame rate - partial mode
+        self.data([0x01, 0x2C, 0x2D, 0x01, 0x2C, 0x2D])
 
-        self.command(ST7735_INVCTR)     # Display inversion ctrl
+        self.command(ST7735_INVCTR)
         self.data(0x07)
 
-        self.command(ST7735_PWCTR1)     # Power control
-        self.data(0xA2)
-        self.data(0x02)
-        self.data(0x84)
+        self.command(ST7735_PWCTR1)
+        self.data([0xA2, 0x02, 0x84])
 
         self.command(ST7735_PWCTR2)
-        self.data(0x0A)
-        self.data(0x00)
+        self.data([0x0A, 0x00])
 
         self.command(ST7735_PWCTR4)
-        self.data(0x8A)
-        self.data(0x2A)
+        self.data([0x8A, 0x2A])
 
         self.command(ST7735_PWCTR5)
-        self.data(0x8A)
-        self.data(0xEE)
+        self.data([0x8A, 0xEE])
 
         self.command(ST7735_VMCTR1)
         self.data(0x0E)
 
-        if self._invert:
-            self.command(ST7735_INVON)
-        else:
-            self.command(ST7735_INVOFF)
+        self.command(ST7735_INVON if self._invert else ST7735_INVOFF)
 
-        # MADCTL register controls scan direction:
-        #   Bit 7 (MY)  = Row address order    (1=bottom-to-top)
-        #   Bit 6 (MX)  = Column address order (1=right-to-left)
-        #   Bit 5 (MV)  = Row/Column exchange
-        #   Bit 3 (RGB) = 0=RGB order, 1=BGR order
-        #
-        # TBM drawing code rotates every element 270° in software before
-        # writing to the 128×160 screen_buffer. The MADCTL value must be
-        # chosen so that hardware scan direction + software 270° rotation
-        # produces the correct final portrait orientation.
-        #
-        # Orientation test log (user photos, TBM 1.8" panel, bgr=True):
-        #   MADCTL  MY MX  Result
-        #   0xC0     1  1  upside-down + left-right mirrored  (confirmed v2.11)
-        #   0x40     0  1  upside-down only
-        #   0x80     1  0  left-right mirrored only
-        #   0x00     0  0  CORRECT portrait, no flip           ← use this
-        #
-        # With bgr=True the colour byte is 0x00 (RGB bit=0 = BGR order).
-        # With bgr=False the colour byte is 0x08 (RGB bit=1 = RGB order).
-        #
-        # 0x00 = 0000 0000 = MY=0, MX=0, BGR  ← correct for bgr=True
-        # 0x08 = 0000 1000 = MY=0, MX=0, RGB  ← correct for bgr=False
-        madctl = 0x00 if self._bgr else 0x08
+        # MADCTL: MY=0, MX=0, MV=0
+        # BGR bit (bit 3): 0 = BGR order, 1 = RGB order
+        # bgr=True  → panel uses BGR order → bit3=0 → 0x00
+        # bgr=False → panel uses RGB order → bit3=1 → 0x08
         self.command(ST7735_MADCTL)
-        self.data(madctl)
+        self.data(0x00 if self._bgr else 0x08)
 
-        self.command(ST7735_COLMOD)     # 16-bit colour
-        self.data(0x05)
+        self.command(ST7735_COLMOD)
+        self.data(0x05)                 # 16-bit colour
 
-        # Set full display window using doido-technologies offset values
-        self.command(ST7735_CASET)
-        self.data(0x00)
-        self.data(self._offset_left)
-        self.data(0x00)
-        self.data(self._width + self._offset_left - 1)
-
-        self.command(ST7735_RASET)
-        self.data(0x00)
-        self.data(self._offset_top)
-        self.data(0x00)
-        self.data(self._height + self._offset_top - 1)
-
-        self.command(ST7735_GMCTRP1)    # Gamma correction
-        self.data(0x02)
-        self.data(0x1c)
-        self.data(0x07)
-        self.data(0x12)
-        self.data(0x37)
-        self.data(0x32)
-        self.data(0x29)
-        self.data(0x2d)
-        self.data(0x29)
-        self.data(0x25)
-        self.data(0x2B)
-        self.data(0x39)
-        self.data(0x00)
-        self.data(0x01)
-        self.data(0x03)
-        self.data(0x10)
+        self.command(ST7735_GMCTRP1)
+        self.data([0x02, 0x1C, 0x07, 0x12, 0x37, 0x32, 0x29, 0x2D,
+                   0x29, 0x25, 0x2B, 0x39, 0x00, 0x01, 0x03, 0x10])
 
         self.command(ST7735_GMCTRN1)
-        self.data(0x03)
-        self.data(0x1d)
-        self.data(0x07)
-        self.data(0x06)
-        self.data(0x2E)
-        self.data(0x2C)
-        self.data(0x29)
-        self.data(0x2D)
-        self.data(0x2E)
-        self.data(0x2E)
-        self.data(0x37)
-        self.data(0x3F)
-        self.data(0x00)
-        self.data(0x00)
-        self.data(0x02)
-        self.data(0x10)
+        self.data([0x03, 0x1D, 0x07, 0x06, 0x2E, 0x2C, 0x29, 0x2D,
+                   0x2E, 0x2E, 0x37, 0x3F, 0x00, 0x00, 0x02, 0x10])
 
         self.command(ST7735_NORON)
         time.sleep(0.10)
@@ -354,29 +227,20 @@ class ST7735(object):
         if y1 is None:
             y1 = self._height - 1
 
-        y0 += self._offset_top
-        y1 += self._offset_top
         x0 += self._offset_left
         x1 += self._offset_left
+        y0 += self._offset_top
+        y1 += self._offset_top
 
         self.command(ST7735_CASET)
-        self.data(x0 >> 8)
-        self.data(x0 & 0xFF)
-        self.data(x1 >> 8)
-        self.data(x1 & 0xFF)
+        self.data([x0 >> 8, x0 & 0xFF, x1 >> 8, x1 & 0xFF])
 
         self.command(ST7735_RASET)
-        self.data(y0 >> 8)
-        self.data(y0 & 0xFF)
-        self.data(y1 >> 8)
-        self.data(y1 & 0xFF)
+        self.data([y0 >> 8, y0 & 0xFF, y1 >> 8, y1 & 0xFF])
 
         self.command(ST7735_RAMWR)
 
     def display(self, image):
-        """Write a PIL Image to the LCD.
-        Image must be RGB mode and exactly width x height pixels.
-        """
+        """Write a PIL Image (RGB, width×height) to the LCD."""
         self.set_window()
-        pixelbytes = image_to_data(image)
-        self.data(pixelbytes)
+        self.data(image_to_data(image))

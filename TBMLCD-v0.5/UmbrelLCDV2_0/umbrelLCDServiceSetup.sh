@@ -1,8 +1,11 @@
 #!/bin/bash
 #-------------------------------------------------------------------------------
 #   Copyright (c) DOIDO Technologies
-#   Version  : 1.4.0  (Umbrel 1.x compatible fork)
+#   Version  : 1.5.0  (Umbrel 1.x compatible fork)
 #   Changes  :
+#     v1.5.0: Korean yes/no now also accepts 예/네/아니오/아니 in addition to yes/no.
+#             YES_WORD variable removed (direct comparison in ask_screen).
+#             Code cleanup: removed unused YES_WORD variable.
 #     v1.4.0: Fixed language selection (eval bug replaced with case/if approach).
 #             Duration prompts now read actual defaults from config.ini.
 #             Default screen durations changed to 10s.
@@ -51,10 +54,10 @@ T() {
                 S5_DESC)           echo "Network info" ;;
                 S6_DESC)           echo "Lightning channels" ;;
                 S7_DESC)           echo "Disk usage" ;;
-                ASK_SCREEN)        echo "Display Screen $2 ($3)? [yes/no]: " ;;
+                ASK_SCREEN)        echo "Display Screen $2 ($3)? [yes/no/y/n]: " ;;
                 ADDED)             echo "✔ Screen $2 added." ;;
                 SKIPPED)           echo "- Screen $2 skipped." ;;
-                INVALID_YN)        echo "Invalid input. Please enter yes or no." ;;
+                INVALID_YN)        echo "Invalid input. Please enter yes, no, y, or n." ;;
                 SCREENS_SELECTED)  echo "Screens selected:" ;;
                 CURRENCY_PROMPT)   echo "Please enter your currency code (e.g., USD, KRW, EUR, JPY): " ;;
                 CURRENCY_VALID)    echo "✔ Currency set to: $2" ;;
@@ -89,10 +92,10 @@ T() {
                 S5_DESC)           echo "네트워크 정보" ;;
                 S6_DESC)           echo "라이트닝 채널" ;;
                 S7_DESC)           echo "디스크 용량" ;;
-                ASK_SCREEN)        echo "화면 $2 ($3) 을 표시할까요? [yes/no]: " ;;
+                ASK_SCREEN)        echo "화면 $2 ($3) 을 표시할까요? [예/아니오 또는 yes/no]: " ;;
                 ADDED)             echo "✔ 화면 $2 추가됨." ;;
                 SKIPPED)           echo "- 화면 $2 건너뜀." ;;
-                INVALID_YN)        echo "잘못된 입력입니다. yes 또는 no 로 입력해주세요." ;;
+                INVALID_YN)        echo "잘못된 입력입니다. 예/네/아니오/아니 또는 yes/no 로 입력해주세요." ;;
                 SCREENS_SELECTED)  echo "선택된 화면:" ;;
                 CURRENCY_PROMPT)   echo "통화 코드를 입력하세요 (예: USD, KRW, EUR, JPY): " ;;
                 CURRENCY_VALID)    echo "✔ 통화 설정: $2" ;;
@@ -172,12 +175,16 @@ ask_screen() {
     local gettingChoice=true
     while $gettingChoice; do
         read -rp "$prompt" ans
-        ans="${ans^^}"
-        if [ "$ans" = "$YES_WORD" ]; then
+        ans_upper="${ans^^}"
+        # Accept: yes/YES/y/Y (EN) and 예/네 (KO)
+        if [ "$ans_upper" = "YES" ] || [ "$ans_upper" = "Y" ] || \
+           [ "$ans" = "예" ] || [ "$ans" = "네" ]; then
             echo -e "  \e[1;32m$(T ADDED "$num")\e[0m"
             userScreenChoices="${userScreenChoices}Screen${num},"
             gettingChoice=false
-        elif [ "$ans" = "NO" ]; then
+        # Accept: no/NO/n/N (EN) and 아니오/아니/no (KO)
+        elif [ "$ans_upper" = "NO" ] || [ "$ans_upper" = "N" ] || \
+             [ "$ans" = "아니오" ] || [ "$ans" = "아니" ]; then
             echo "  $(T SKIPPED "$num")"
             gettingChoice=false
         else
