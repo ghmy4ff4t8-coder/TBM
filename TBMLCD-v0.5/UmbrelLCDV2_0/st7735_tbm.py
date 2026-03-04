@@ -5,11 +5,16 @@
 #   Original: Copyright (c) 2014 Adafruit Industries, Author: Tony DiCola
 #
 #   Modified for Umbrel OS 1.x compatibility:
-#   - Replaced RPi.GPIO with gpiod (Linux GPIO character device)
+#   - Replaced RPi.GPIO with gpiod 2.x API (Linux GPIO character device)
 #   - Replaced RPi.GPIO SPI with spidev direct calls
 #   - Removed all pimoroni/st7735-python dependencies
 #   - Kept original MADCTL=0xC8, ST7735_COLS=128, ST7735_ROWS=160
 #     (doido-technologies values, NOT pimoroni's 132x162)
+#
+#   gpiod 2.x API changes (gpiod >= 2.0):
+#   - chip.get_line() + line.request() REMOVED
+#   - New API: chip.request_lines(config={offset: LineSettings(...)}, ...)
+#   - set_value() now takes gpiod.line.Value.ACTIVE / INACTIVE
 #
 #   Key hardware parameters for TBM 1.8" 128x160 ST7735 panel:
 #   - offset_left = 0  (ST7735_COLS=128, panel width=128, no offset needed)
@@ -115,34 +120,50 @@ class ST7735(object):
         self._spi.lsbfirst = False
         self._spi.max_speed_hz = spi_speed_hz
 
-        # --- GPIO setup via gpiod ---
-        # Try gpiochip0 first, fall back to gpiochip4 (Pi 5)
+        # --- GPIO setup via gpiod 2.x API ---
+        # gpiod 2.x completely replaced the 1.x API:
+        #   OLD (1.x): chip.get_line(n) + line.request(type=LINE_REQ_DIR_OUT)
+        #   NEW (2.x): chip.request_lines(config={n: LineSettings(direction=Direction.OUTPUT)})
+        #
+        # Try gpiochip0 first (Pi 4), fall back to gpiochip4 (Pi 5)
         self._gpio_chip = None
-        for chip_name in ('gpiochip0', 'gpiochip4'):
+        for chip_path in ('/dev/gpiochip0', '/dev/gpiochip4', '/dev/gpiochip1'):
             try:
-                chip = gpiod.Chip(chip_name)
+                chip = gpiod.Chip(chip_path)
                 self._gpio_chip = chip
+                self._gpio_chip_path = chip_path
                 break
             except Exception:
                 continue
         if self._gpio_chip is None:
             raise RuntimeError('Cannot open any gpiochip device. Is gpiod installed?')
 
-        # Request DC pin as output
-        self._dc_line = self._gpio_chip.get_line(dc)
-        self._dc_line.request(consumer='st7735-dc', type=gpiod.LINE_REQ_DIR_OUT, default_vals=[0])
+        # Build pin config dict for gpiod 2.x request_lines()
+        dc_settings = gpiod.LineSettings(
+            direction=gpiod.line.Direction.OUTPUT,
+            output_value=gpiod.line.Value.INACTIVE
+        )
+        pin_config = {dc: dc_settings}
 
-        # Request RST pin as output (if provided)
-        self._rst_line = None
         if rst is not None:
-            self._rst_line = self._gpio_chip.get_line(rst)
-            self._rst_line.request(consumer='st7735-rst', type=gpiod.LINE_REQ_DIR_OUT, default_vals=[1])
+            rst_settings = gpiod.LineSettings(
+                direction=gpiod.line.Direction.OUTPUT,
+                output_value=gpiod.line.Value.ACTIVE
+            )
+            pin_config[rst] = rst_settings
+
+        self._gpio_request = self._gpio_chip.request_lines(
+            config=pin_config,
+            consumer='st7735-tbm'
+        )
 
         self.reset()
         self._init()
 
     def _set_dc(self, value):
-        self._dc_line.set_value(value)
+        # gpiod 2.x uses gpiod.line.Value enum instead of integers
+        v = gpiod.line.Value.ACTIVE if value else gpiod.line.Value.INACTIVE
+        self._gpio_request.set_value(self._dc_pin, v)
 
     def send(self, data, is_data=True, chunk_size=4096):
         """Write bytes to the display. is_data=True for pixel data, False for commands."""
@@ -161,12 +182,12 @@ class ST7735(object):
 
     def reset(self):
         """Hardware reset via RST pin (if connected)."""
-        if self._rst_line is not None:
-            self._rst_line.set_value(1)
+        if self._rst_pin is not None:
+            self._gpio_request.set_value(self._rst_pin, gpiod.line.Value.ACTIVE)
             time.sleep(0.500)
-            self._rst_line.set_value(0)
+            self._gpio_request.set_value(self._rst_pin, gpiod.line.Value.INACTIVE)
             time.sleep(0.500)
-            self._rst_line.set_value(1)
+            self._gpio_request.set_value(self._rst_pin, gpiod.line.Value.ACTIVE)
             time.sleep(0.500)
 
     def begin(self):

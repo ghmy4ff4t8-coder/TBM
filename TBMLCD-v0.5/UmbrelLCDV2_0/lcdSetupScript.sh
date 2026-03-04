@@ -27,9 +27,10 @@ echo "Installing packages required for the library to work..."
 echo " "
 sudo apt update
 sudo apt install -y build-essential python3-dev python3-smbus python3-pip python3-pil python3-numpy
-sudo apt install -y python3-spidev spidev
-# gpiod is required by pimoroni/st7735-python v1.0.0
-sudo apt install -y python3-gpiod gpiod libgpiod-dev
+# python3-spidev: correct apt package name (not 'spidev')
+sudo apt install -y python3-spidev || true
+# gpiod: install via pip (apt package 'python3-gpiod' may not exist on all distros)
+sudo apt install -y gpiod libgpiod-dev || true
 
 echo " "
 echo "Installing Python libraries..."

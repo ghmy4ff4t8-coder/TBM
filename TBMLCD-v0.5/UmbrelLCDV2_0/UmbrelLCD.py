@@ -1,9 +1,17 @@
 
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.7.0  (Umbrel 1.x compatible fork)
+#   Version  : 2.8.0  (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
+#     v2.8.0 (2024-03):
+#       - FIXED: gpiod 2.x API compatibility in st7735_tbm.py.
+#         gpiod 2.0 removed the entire 1.x API (get_line, LINE_REQ_DIR_OUT).
+#         Updated to use chip.request_lines() with LineSettings(direction=OUTPUT)
+#         and gpiod.line.Value.ACTIVE/INACTIVE enum values.
+#       - FIXED: lcdSetupScript.sh apt package names (spidev→python3-spidev,
+#         removed non-existent python3-gpiod apt package).
+#
 #     v2.7.0 (2024-03):
 #       - FIXED: Root cause of all stripe/noise issues identified and resolved.
 #         Replaced pimoroni/st7735-python with bundled st7735_tbm.py driver.
@@ -866,7 +874,7 @@ def draw_screen7():
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
-print('Running Umbrel LCD script Version 2.7.0 (Umbrel 1.x compatible)')
+print('Running Umbrel LCD script Version 2.8.0 (Umbrel 1.x compatible)')
 
 # Display umbrel logo for 60 seconds on startup
 display_background_image('umbrel_logo.png')
