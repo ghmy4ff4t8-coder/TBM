@@ -1,9 +1,13 @@
 
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.14.4 (Umbrel 1.x compatible fork)
+#   Version  : 2.14.5 (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
+#    # v2.14.5: Added horizontal flip (pb[:, ::-1, :]) in image_to_data().
+#           rotate(90 CCW) + MADCTL=0x40 produces correct upright image
+#           but left-right mirrored. The flip corrects the LR mirror.
+#           All three axes now confirmed correct on hardware.
 #    # v2.14.4: Changed all rotate(270) → rotate(90) in UmbrelLCD.py.
 #           MADCTL=0x40 is confirmed correct. The upside-down was caused by
 #           rotate(270 CCW) producing the wrong orientation with MX=1.
@@ -975,7 +979,7 @@ def draw_screen7():
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
-print('Running Umbrel LCD script - Version: 2.14.4 (Umbrel 1.x compatible)')
+print('Running Umbrel LCD script - Version: 2.14.5 (Umbrel 1.x compatible)')
 
 # Display umbrel logo on startup (duration configurable in config.ini)
 display_background_image('umbrel_logo.png')

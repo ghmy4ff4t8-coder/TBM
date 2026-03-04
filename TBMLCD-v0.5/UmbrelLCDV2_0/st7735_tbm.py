@@ -66,12 +66,14 @@ ST7735_GMCTRN1 = 0xE1
 def image_to_data(image):
     """Convert a PIL Image to a flat list of 16-bit RGB565 bytes.
 
-    No rotation is applied here. UmbrelLCD.py rotates all content 270° CCW
-    before writing to the 128×160 buffer, and MADCTL=0x40 (MX=1, BGR) provides
-    the correct hardware scan direction to produce a proper portrait display.
-    This combination was confirmed working in v2.10.0.
+    A horizontal flip (left-right mirror) is applied before conversion.
+    UmbrelLCD.py rotates all content 90° CCW before writing to the 128×160
+    buffer. With MADCTL=0x40 (MX=1, BGR) the image is upright but
+    left-right mirrored, so we correct that here with pb[:, ::-1, :].
+    Confirmed correct orientation: v2.14.5.
     """
     pb = np.array(image.convert('RGB')).astype('uint16')
+    pb = pb[:, ::-1, :]          # horizontal flip to correct LR mirror
     color = ((pb[:, :, 0] & 0xF8) << 8) | \
             ((pb[:, :, 1] & 0xFC) << 3) | \
              (pb[:, :, 2] >> 3)
