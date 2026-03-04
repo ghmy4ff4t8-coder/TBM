@@ -87,7 +87,7 @@ sudo reboot
 1.  **작업 폴더로 다시 이동하기**
 
     ```bash
-    cd TBM/TBMLCD-v0.5/UmbrelLCDV2_0
+    cd ~/TBM/TBMLCD-v0.5/UmbrelLCDV2_0
     ```
 
 2.  **서비스 설정 스크립트 실행하기**
