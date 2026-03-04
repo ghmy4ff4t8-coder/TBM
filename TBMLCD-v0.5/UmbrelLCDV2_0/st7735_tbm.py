@@ -260,13 +260,19 @@ class ST7735(object):
         #   Bit 3 (RGB) = 0=RGB order, 1=BGR order
         #
         # TBM panel orientation determination (from user photos):
-        #   0xC8 (MY=1,MX=1,RGB): 180° rotated (both axes flipped)
-        #   0x08 (MY=0,MX=0,RGB): top-bottom correct, left-right still mirrored
-        #   0x48 (MY=0,MX=1,RGB): correct orientation
-        #   0x40 (MY=0,MX=1,BGR): correct orientation + BGR colour order
-        # MADCTL bit 3 = 0 means BGR, bit 3 = 1 means RGB (ST7735 spec)
-        # bgr=True → clear bit 3 → 0x40; bgr=False → set bit 3 → 0x48
-        madctl = 0x40 if self._bgr else 0x48
+        #   0xC8 (MY=1,MX=1,RGB): 180° rotated
+        #   0x08 (MY=0,MX=0,RGB): top-bottom OK, left-right mirrored
+        #   0x48 (MY=0,MX=1,RGB): left-right OK, but top-bottom flipped
+        #   0xC8 (MY=1,MX=1,RGB): both flipped again
+        #   0xC0 (MY=1,MX=1,BGR): correct orientation + BGR colour order
+        #   0xC8 (MY=1,MX=1,RGB): correct orientation, RGB colour order
+        #
+        # Confirmed by user photos:
+        #   bgr=True + MY=1 + MX=1 = correct image, correct colours
+        #   MADCTL: bit7=MY, bit6=MX, bit3=0(BGR)/1(RGB)
+        #   0xC0 = 1100 0000 = MY=1, MX=1, BGR
+        #   0xC8 = 1100 1000 = MY=1, MX=1, RGB
+        madctl = 0xC0 if self._bgr else 0xC8
         self.command(ST7735_MADCTL)
         self.data(madctl)
 

@@ -1,234 +1,183 @@
 #!/bin/bash
 #-------------------------------------------------------------------------------
 #   Copyright (c) DOIDO Technologies
-#   Version  : 1.1.0  (Umbrel 1.x compatible fork)
-#   Location : github
+#   Version  : 1.2.0  (Umbrel 1.x compatible fork)
 #   Changes  :
-#     - Fixed sudo echo redirect issue (use tee instead)
-#     - Added After=docker.service to ensure docker is ready before LCD starts
-#     - Added StandardOutput/StandardError logging to journald
-#     - Added Environment variable for PATH to ensure docker is found
+#     v1.2.0: Added interactive screen duration settings (config.ini 자동 생성)
+#     v1.1.0: Fixed sudo echo redirect, added docker.service dependency
 #-------------------------------------------------------------------------------
-# This script is used to create Umbrel lcd service.
-# It also enables the user to select screens and currency to be used.
+# This script creates the Umbrel LCD systemd service.
+# It asks which screens to show, currency, and how long each screen stays on.
 #-------------------------------------------------------------------------------
 
-# Screen selection menu
 echo "=================================================================================="
-echo "                              SCREEN SELECTION MENU"
+echo "         TBM (The Bitcoin Machine) - LCD 서비스 설정"
 echo "=================================================================================="
 echo
-echo "Available screens to be displayed on the LCD:"
-echo "                    Screen 1: Bitcoin price and sats/unit of currency."
-echo "                    Screen 2: Next Bitcoin block information."
-echo "                    Screen 3: Current Bitcoin block height."
-echo "                    Screen 4: Current date and time."
-echo "                    Screen 5: Bitcoin network information."
-echo "                    Screen 6: Payment channels information."
-echo "                    Screen 7: Disk storage information."
-echo
-echo "Please answer by typing yes or no then press the enter key."
+echo "이 스크립트는 LCD에 표시할 화면, 통화, 화면 전환 시간을 설정합니다."
+echo "각 질문에 yes 또는 no 로 답하고 Enter 를 누르세요."
 echo
 
-# a string to hold user screen choices
+# ──────────────────────────────────────────────────────────────────────────────
+# 화면 선택
+# ──────────────────────────────────────────────────────────────────────────────
+echo "=================================================================================="
+echo "                              화면 선택"
+echo "=================================================================================="
+echo
+echo "  화면 1: 비트코인 가격 및 단위 통화당 사토시"
+echo "  화면 2: 다음 비트코인 블록 정보"
+echo "  화면 3: 현재 비트코인 블록 높이"
+echo "  화면 4: 현재 날짜 및 시간"
+echo "  화면 5: 비트코인 네트워크 정보"
+echo "  화면 6: 라이트닝 페이먼트 채널 정보"
+echo "  화면 7: 노드 디스크 저장 공간 정보"
+echo
+
 userScreenChoices=""
-# Get user choice about screen 1
-gettingUserChoice=true
-# Loop until user enters a valid choice
-while $gettingUserChoice 
-	do
-    	read -p "Would you like screen 1 to be displayed on the LCD?  " userAnswer
-        # Convert to uppercase
-		userAnswer=${userAnswer^^}
 
-		# Check if entered a valid option
-		if [ $userAnswer == "YES" ]
-            then
-                echo -e "\e[1;32m Adding screen 1. \e[0m"
-                userScreenChoices="${userScreenChoices}Screen1,"
-                gettingUserChoice=false
-		elif [ $userAnswer == "NO" ]
-            then
-                echo "Not Adding screen 1."
-                gettingUserChoice=false
-		else
-           echo -e "\e[1;31m Your answer is not valid. \e[0m"
-		fi
-	done
+ask_screen() {
+    local num=$1
+    local desc=$2
+    local gettingChoice=true
+    while $gettingChoice; do
+        read -p "화면 ${num} (${desc}) 을 표시할까요? [yes/no]: " ans
+        ans=${ans^^}
+        if [ "$ans" == "YES" ]; then
+            echo -e "\e[1;32m  ✔ 화면 ${num} 추가됨\e[0m"
+            userScreenChoices="${userScreenChoices}Screen${num},"
+            gettingChoice=false
+        elif [ "$ans" == "NO" ]; then
+            echo "  화면 ${num} 건너뜀"
+            gettingChoice=false
+        else
+            echo -e "\e[1;31m  yes 또는 no 로 입력해주세요.\e[0m"
+        fi
+    done
+}
 
-# Get user choice about screen 2
-gettingUserChoice=true
-# Loop until user enters a valid choice
-while $gettingUserChoice 
-	do
-    	read -p "Would you like screen 2 to be displayed on the LCD?  " userAnswer
-        # Convert to uppercase
-		userAnswer=${userAnswer^^}
+ask_screen 1 "비트코인 가격"
+ask_screen 2 "다음 블록 정보"
+ask_screen 3 "블록 높이"
+ask_screen 4 "날짜/시간"
+ask_screen 5 "네트워크 정보"
+ask_screen 6 "라이트닝 채널"
+ask_screen 7 "디스크 용량"
 
-		# Check if entered a valid option
-		if [ $userAnswer == "YES" ]
-            then
-                echo -e "\e[1;32m Adding screen 2. \e[0m"
-                userScreenChoices="${userScreenChoices}Screen2,"
-                gettingUserChoice=false
-		elif [ $userAnswer == "NO" ]
-            then
-                echo "Not Adding screen 2."
-                gettingUserChoice=false
-		else
-           echo -e "\e[1;31m Your answer is not valid. \e[0m"
-		fi
-	done
-
-# Get user choice about screen 3
-gettingUserChoice=true
-# Loop until user enters a valid choice
-while $gettingUserChoice 
-	do
-    	read -p "Would you like screen 3 to be displayed on the LCD?  " userAnswer
-        # Convert to uppercase
-		userAnswer=${userAnswer^^}
-
-		# Check if entered a valid option
-		if [ $userAnswer == "YES" ]
-            then
-                echo -e "\e[1;32m Adding screen 3. \e[0m"
-                userScreenChoices="${userScreenChoices}Screen3,"
-                gettingUserChoice=false
-		elif [ $userAnswer == "NO" ]
-            then
-                echo "Not Adding screen 3."
-                gettingUserChoice=false
-		else
-           echo -e "\e[1;31m Your answer is not valid. \e[0m"
-		fi
-	done
-
-# Get user choice about screen 4
-gettingUserChoice=true
-# Loop until user enters a valid choice
-while $gettingUserChoice 
-	do
-    	read -p "Would you like screen 4 to be displayed on the LCD?  " userAnswer
-        # Convert to uppercase
-		userAnswer=${userAnswer^^}
-
-		# Check if entered a valid option
-		if [ $userAnswer == "YES" ]
-            then
-                echo -e "\e[1;32m Adding screen 4. \e[0m"
-                userScreenChoices="${userScreenChoices}Screen4,"
-                gettingUserChoice=false
-		elif [ $userAnswer == "NO" ]
-            then
-                echo "Not Adding screen 4."
-                gettingUserChoice=false
-		else
-           echo -e "\e[1;31m Your answer is not valid. \e[0m"
-		fi
-	done
-
-# Get user choice about screen 5
-gettingUserChoice=true
-# Loop until user enters a valid choice
-while $gettingUserChoice 
-	do
-    	read -p "Would you like screen 5 to be displayed on the LCD?  " userAnswer
-        # Convert to uppercase
-		userAnswer=${userAnswer^^}
-
-		# Check if entered a valid option
-		if [ $userAnswer == "YES" ]
-            then
-                echo -e "\e[1;32m Adding screen 5. \e[0m"
-                userScreenChoices="${userScreenChoices}Screen5,"
-                gettingUserChoice=false
-		elif [ $userAnswer == "NO" ]
-            then
-                echo "Not Adding screen 5."
-                gettingUserChoice=false
-		else
-           echo -e "\e[1;31m Your answer is not valid. \e[0m"
-		fi
-	done
-
-# Get user choice about screen 6
-gettingUserChoice=true
-# Loop until user enters a valid choice
-while $gettingUserChoice 
-	do
-    	read -p "Would you like screen 6 to be displayed on the LCD?  " userAnswer
-        # Convert to uppercase
-		userAnswer=${userAnswer^^}
-
-		# Check if entered a valid option
-		if [ $userAnswer == "YES" ]
-            then
-                echo -e "\e[1;32m Adding screen 6. \e[0m"
-                userScreenChoices="${userScreenChoices}Screen6,"
-                gettingUserChoice=false
-		elif [ $userAnswer == "NO" ]
-            then
-                echo "Not Adding screen 6."
-                gettingUserChoice=false
-		else
-           echo -e "\e[1;31m Your answer is not valid. \e[0m"
-		fi
-	done
-
-# Get user choice about screen 7
-gettingUserChoice=true
-# Loop until user enters a valid choice
-while $gettingUserChoice 
-	do
-    	read -p "Would you like screen 7 to be displayed on the LCD?  " userAnswer
-        # Convert to uppercase
-		userAnswer=${userAnswer^^}
-
-		# Check if entered a valid option
-		if [ $userAnswer == "YES" ]
-            then
-                echo -e "\e[1;32m Adding screen 7. \e[0m"
-                userScreenChoices="${userScreenChoices}Screen7"
-                gettingUserChoice=false
-		elif [ $userAnswer == "NO" ]
-            then
-                echo "Not Adding screen 7."
-                gettingUserChoice=false
-		else
-           echo -e "\e[1;31m Your answer is not valid. \e[0m"
-		fi
-	done
-
-echo "User choices: ${userScreenChoices}"
+echo
+echo "선택된 화면: ${userScreenChoices}"
 echo
 
-echo "=============================================================================================="
-echo "                                      CURRENCY SELECTION"
-echo "=============================================================================================="
-# Get user currency
+# ──────────────────────────────────────────────────────────────────────────────
+# 통화 선택
+# ──────────────────────────────────────────────────────────────────────────────
+echo "=================================================================================="
+echo "                              통화 선택"
+echo "=================================================================================="
+echo
+
 gettingCurrency=true
-# Loop until user enters a valid currency
-while $gettingCurrency 
-	do
-    	echo
-		read -p "Please Enter Currency Code e.g. USD for US Dollar: " newCurrency
-		# Convert to uppercase
-		newCurrency=${newCurrency^^}
-		echo $newCurrency
+while $gettingCurrency; do
+    read -p "통화 코드를 입력하세요 (예: USD, KRW, EUR, JPY): " newCurrency
+    newCurrency=${newCurrency^^}
+    validationResult=$(python3 ./CurrencyData.py ${newCurrency})
+    if [ "$validationResult" = "Valid" ]; then
+        echo -e "\e[1;32m  ✔ 통화: ${newCurrency}\e[0m"
+        gettingCurrency=false
+    else
+        echo -e "\e[1;31m  유효하지 않은 통화 코드입니다. 다시 입력해주세요.\e[0m"
+    fi
+done
 
-		# Check if user entered a valid currency code
-		validationResult=$(python3 ./CurrencyData.py ${newCurrency})
-		if [ "$validationResult" = "Valid" ]; then
-    			echo "Creating Umbrel ST7735 LCD Service."
-    			gettingCurrency=false
-			
-				# Get current working directory
-				cwd=$(pwd)
+echo
 
-# Create A Unit File using tee (fixes sudo echo redirect issue)
-# Added After=docker.service for Umbrel 1.x compatibility
-# Added PATH environment so docker binary is found by systemd
+# ──────────────────────────────────────────────────────────────────────────────
+# 화면 전환 시간 설정
+# ──────────────────────────────────────────────────────────────────────────────
+echo "=================================================================================="
+echo "                         화면 전환 시간 설정 (초)"
+echo "=================================================================================="
+echo
+echo "각 화면이 LCD에 표시되는 시간을 초 단위로 입력하세요."
+echo "그냥 Enter 를 누르면 기본값이 적용됩니다."
+echo
+
+# 시작 로고 표시 시간
+while true; do
+    read -p "시작 시 Umbrel 로고 표시 시간 (기본값: 60초): " logoDuration
+    logoDuration=${logoDuration:-60}
+    if [[ "$logoDuration" =~ ^[0-9]+$ ]] && [ "$logoDuration" -gt 0 ]; then
+        echo -e "\e[1;32m  ✔ 로고 표시 시간: ${logoDuration}초\e[0m"
+        break
+    else
+        echo -e "\e[1;31m  양의 정수를 입력해주세요.\e[0m"
+    fi
+done
+
+# 비트코인 가격 화면 표시 시간
+while true; do
+    read -p "비트코인 가격 화면 표시 시간 (기본값: 6초): " screen1Duration
+    screen1Duration=${screen1Duration:-6}
+    if [[ "$screen1Duration" =~ ^[0-9]+$ ]] && [ "$screen1Duration" -gt 0 ]; then
+        echo -e "\e[1;32m  ✔ 가격 화면 표시 시간: ${screen1Duration}초\e[0m"
+        break
+    else
+        echo -e "\e[1;31m  양의 정수를 입력해주세요.\e[0m"
+    fi
+done
+
+# 나머지 화면 표시 시간
+while true; do
+    read -p "나머지 화면들 표시 시간 (기본값: 6초): " screenDuration
+    screenDuration=${screenDuration:-6}
+    if [[ "$screenDuration" =~ ^[0-9]+$ ]] && [ "$screenDuration" -gt 0 ]; then
+        echo -e "\e[1;32m  ✔ 나머지 화면 표시 시간: ${screenDuration}초\e[0m"
+        break
+    else
+        echo -e "\e[1;31m  양의 정수를 입력해주세요.\e[0m"
+    fi
+done
+
+echo
+
+# ──────────────────────────────────────────────────────────────────────────────
+# config.ini 자동 생성
+# ──────────────────────────────────────────────────────────────────────────────
+cwd=$(pwd)
+
+cat > "${cwd}/config.ini" << CONFIGEOF
+# ============================================================
+#  TBM (The Bitcoin Machine) - LCD 설정 파일 (자동 생성됨)
+#  설정 변경 후: sudo systemctl restart UmbrelST7735LCD
+# ============================================================
+
+[DISPLAY]
+logo_duration    = ${logoDuration}
+screen1_duration = ${screen1Duration}
+screen_duration  = ${screenDuration}
+
+[BITCOIN]
+# rpc_user = umbrel
+# rpc_pass = moneyprintergobrrr
+# rpc_host = 127.0.0.1
+# rpc_port = 8332
+# container = bitcoin_bitcoind_1
+
+[LIGHTNING]
+# container = lightning_lnd_1
+CONFIGEOF
+
+echo -e "\e[1;32m  ✔ config.ini 생성 완료\e[0m"
+echo
+
+# ──────────────────────────────────────────────────────────────────────────────
+# systemd 서비스 생성
+# ──────────────────────────────────────────────────────────────────────────────
+echo "=================================================================================="
+echo "                         LCD 서비스 생성 중..."
+echo "=================================================================================="
+echo
+
 sudo tee /lib/systemd/system/UmbrelST7735LCD.service > /dev/null << EOF
 [Unit]
 Description=Umbrel LCD Service
@@ -249,19 +198,16 @@ SyslogIdentifier=UmbrelST7735LCD
 WantedBy=multi-user.target
 EOF
 
-				# The permission on the unit file needs to be set to 644
-				sudo chmod 644 /lib/systemd/system/UmbrelST7735LCD.service
+sudo chmod 644 /lib/systemd/system/UmbrelST7735LCD.service
+sudo systemctl daemon-reload
+sudo systemctl enable UmbrelST7735LCD.service
+sudo systemctl start UmbrelST7735LCD.service
 
-				# Configure systemd
-				sudo systemctl daemon-reload
-				sudo systemctl enable UmbrelST7735LCD.service
-
-				# Start the service
-				sudo systemctl start UmbrelST7735LCD.service
-				echo "Done Creating Umbrel ST7735 LCD Service."
-				echo "You can check the service logs with: sudo journalctl -u UmbrelST7735LCD -f"
-		else
-    			#echo "Entered Currency code is not valid!!!"
-    			echo -e "\e[1;31m Entered Currency code is not valid!!! \e[0m"
-		fi
-	done
+echo
+echo -e "\e[1;32m✔ LCD 서비스 설정 완료!\e[0m"
+echo
+echo "  로그 확인: sudo journalctl -u UmbrelST7735LCD -f"
+echo "  서비스 중지: sudo systemctl stop UmbrelST7735LCD"
+echo "  서비스 재시작: sudo systemctl restart UmbrelST7735LCD"
+echo "  설정 재실행: sudo systemctl stop UmbrelST7735LCD && ./umbrelLCDServiceSetup.sh"
+echo
