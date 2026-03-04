@@ -1,19 +1,9 @@
 
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.15.0 (Umbrel 1.x compatible fork)
+#   Version  : 2.14.6 (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
-#    # v2.15.0: Architecture overhaul - replaced background image dependency with
-#           code-based layout for all screens. All labels and values are now
-#           drawn programmatically, eliminating coordinate fragility.
-#           Added draw_grid_cell() helper for 2x2 grid layout.
-#           Screen 5 (Network) and Screen 6 (Payment Channels) now use correct
-#           2x2 grid: top row (x_label=88, x_val=66), bottom row (x_label=44,
-#           x_val=22), left col (y_center=40), right col (y_center=120).
-#           Screen 3 (Block Height): reduced font max to fit within display.
-#           Screen 7 (Storage): removed storage.png icon (was full background),
-#           replaced with text symbol. Reduced font size to prevent title overlap.
 #    # v2.14.6: Changed flip in image_to_data() from column flip ([:, ::-1, :])
 #           to row flip ([::-1, :, :]). After rotate(90 CCW), buffer rows =
 #           original columns, so row flip corrects the LR mirror correctly.
@@ -427,126 +417,6 @@ def display_background_image(image_name):
     draw = ImageDraw.Draw(screen_buffer)
 
 
-# ---------------------------------------------------------------------------
-# Code-based layout helpers (배경 이미지 없이 코드로 직접 그리는 방식)
-# ---------------------------------------------------------------------------
-
-# TBM 브랜드 색상
-BG_DARK   = (20,  10,  60)   # 진한 보라/남색 배경
-BG_BLUE   = (15,  20,  80)   # 짙은 파랑 배경 (Network 화면)
-COL_WHITE = (255, 255, 255)
-COL_GRAY  = (180, 180, 200)
-COL_GREEN = (0,   200,  80)
-COL_ORANGE= (255, 140,   0)
-COL_YELLOW= (255, 200,  50)
-
-
-def clear_screen(bg_color=None):
-    """화면을 단색으로 초기화한다. 배경 이미지 없이 코드 기반 레이아웃의 시작점."""
-    global screen_buffer, draw
-    if bg_color is None:
-        bg_color = BG_DARK
-    screen_buffer = Image.new('RGB', (WIDTH, HEIGHT), bg_color)
-    draw = ImageDraw.Draw(screen_buffer)
-
-
-def pf(size):
-    """Poppins-Bold 폰트 로드 단축 함수."""
-    return ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", size)
-
-
-def text_size(text, font):
-    """텍스트의 (width, height) 반환."""
-    tmp = Image.new('RGBA', (1, 1))
-    tmp_draw = ImageDraw.Draw(tmp)
-    try:
-        bbox = tmp_draw.textbbox((0, 0), text, font=font)
-        return bbox[2] - bbox[0], bbox[3] - bbox[1]
-    except AttributeError:
-        return tmp_draw.textsize(text, font=font)
-
-
-def fit_font_size(text, max_px, min_size=8, max_size=80):
-    """텍스트가 max_px 픽셀 너비에 맞는 최대 폰트 크기를 반환한다."""
-    for size in range(max_size, min_size - 1, -1):
-        w, _ = text_size(text, pf(size))
-        if w <= max_px:
-            return size
-    return min_size
-
-
-def draw_rot(image, text, x, y, font, fill=COL_WHITE):
-    """텍스트를 90도 회전하여 (x, y) 위치에 붙여넣는다.
-
-    LCD 좌표계 (128x160, portrait):
-      x = 0 (화면 위쪽) ~ 127 (화면 아래쪽)
-      y = 0 (화면 왼쪽) ~ 159 (화면 오른쪽)
-
-    텍스트는 90도 회전되므로 원본 텍스트의 '너비'가 y축 방향으로 배치된다.
-    """
-    textimage = make_text_image(text, font, fill)
-    rotated = textimage.rotate(90, expand=1)
-    image.paste(rotated, (x, y), rotated)
-
-
-def draw_rot_centered_y(image, text, x, font, fill=COL_WHITE):
-    """텍스트를 90도 회전하여 y축(가로) 중앙에 배치한다."""
-    textimage = make_text_image(text, font, fill)
-    w, h = textimage.size
-    rotated = textimage.rotate(90, expand=1)
-    y = (HEIGHT - w) // 2
-    image.paste(rotated, (x, y), rotated)
-
-
-def draw_rot_right_y(image, text, x, font, fill=COL_WHITE):
-    """텍스트를 90도 회전하여 y축 오른쪽 끝에 정렬한다."""
-    textimage = make_text_image(text, font, fill)
-    w, h = textimage.size
-    rotated = textimage.rotate(90, expand=1)
-    y = HEIGHT - w - 2
-    image.paste(rotated, (x, y), rotated)
-
-
-def draw_grid_cell(buf, label, val, unit, x_label, x_val, y_center, max_val_width=70):
-    """2x2 그리드의 한 셀을 그린다.
-
-    LCD 좌표계 (128x160, portrait):
-      x: 0=화면 위쪽, 127=화면 아래쪽
-      y: 0=화면 왼쪽, 159=화면 오른쪽
-
-    각 셀 레이아웃 (x축 기준):
-      x_label: 레이블 행 (회색, 작은 글씨)
-      x_val:   값 행 (흰색, 큰 글씨)
-
-    y_center: 셀의 y축 중앙 위치
-    """
-    # 레이블 (작은 글씨, 회색)
-    lbl_w, _ = text_size(label, pf(9))
-    draw_rot(buf, label, x_label, y_center - lbl_w // 2, pf(9), fill=COL_GRAY)
-
-    # 값 (큰 글씨, 흰색) - y 중앙 정렬
-    val_fs = fit_font_size(val, max_val_width, min_size=12, max_size=24)
-    val_w, _ = text_size(val, pf(val_fs))
-    val_y = y_center - val_w // 2
-    draw_rot(buf, val, x_val, val_y, pf(val_fs))
-
-    # 단위 (작은 글씨, 회색) - 값 바로 오른쪽(y축)
-    if unit:
-        draw_rot(buf, unit, x_val, val_y + val_w + 2, pf(9), fill=COL_GRAY)
-
-
-def draw_divider_h(image, x, color=COL_GRAY, thickness=1):
-    """가로 구분선을 그린다 (x 위치, y=0~159)."""
-    d = ImageDraw.Draw(image)
-    d.rectangle((x, 0, x + thickness - 1, HEIGHT - 1), fill=color)
-
-
-def draw_divider_v(image, y, color=COL_GRAY, thickness=1):
-    """세로 구분선을 그린다 (y 위치, x=0~127)."""
-    d = ImageDraw.Draw(image)
-    d.rectangle((0, y, WIDTH - 1, y + thickness - 1), fill=color)
-
-
 def display_icon(image, image_path, position, icon_size):
     picimage = Image.open(image_path).convert('RGBA')
     picimage = picimage.resize((icon_size, icon_size), Image.BICUBIC)
@@ -934,32 +804,21 @@ def display_temperature():
 
 
 def display_block_count_text():
-    """블록 높이 화면 - 코드 기반 레이아웃.
-
-    참고 사이트 레이아웃:
-      - 상단 절반: 하이퍼큐브 아이콘 (중앙)
-      - 하단 절반: 블록 숫자 (큰 글씨, 중앙)
-    """
     try:
-        clear_screen(BG_DARK)
+        display_background_image('Block_HeightBG.png')
+        # Block_HeightBG layout (128x160 after rotate 270):
+        #   Block icon (hexagon): x=53~107, y=61~122 (center-right)
+        #   Left area x=0~52 is empty → place block number here
+        # Pixel analysis: icon bright pixels at x=53~107
+        # fs=26 → text_h=20px, x=5+20=25 (well within x=52 limit)
+        # fs=26 → text_w=100px (within y=160 limit with centered alignment)
         btc_current_block = get_block_count()
-        block_str = str(btc_current_block)
-
-        # 아이콘: 상단 절반 중앙 (x=5~58, y 중앙)
-        icon_size = 50
-        icon_x = 4   # x 위치 (상단 절반)
-        icon_y = (HEIGHT - icon_size) // 2
-        try:
-            display_icon(screen_buffer, images_path + 'Block_HeightBG.png',
-                         (icon_x, icon_y), icon_size)
-        except Exception:
-            # 아이콘 로드 실패 시 텍스트 대체
-            draw_rot(screen_buffer, '#', icon_x, icon_y, pf(40))
-
-        # 블록 숫자: 오른쪽 절반 (x=65~108), y축 중앙
-        # max_px=100으로 제한하여 화면 안에 들어오게 함
-        fs = fit_font_size(block_str, 100, min_size=18, max_size=34)
-        draw_rot_centered_y(screen_buffer, block_str, 65, pf(fs))
+        n = len(str(btc_current_block))
+        # 6 digits: font 26, 7 digits: font 22
+        fs = 26 if n <= 6 else (22 if n == 7 else 18)
+        font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", fs)
+        # Place in left area (x=5), centered vertically on y-axis
+        draw_centered_text(screen_buffer, btc_current_block, 5, 90, font)
     except Exception as e:
         print("Error creating block count text;", str(e))
 
@@ -970,65 +829,51 @@ def draw_screen1(currency):
 
 
 def draw_screen2():
-    """트랜잭션 화면 - 코드 기반 레이아웃.
-
-    참고 사이트 레이아웃:
-      우측 열 (y=82~159): 수수료(sat/vB) 박스 2개
-        상단 박스: 저속 수수료 (1h fee)
-        하단 박스: 빠른 수수료 (fastest fee)
-      좌측 영역 (y=0~80):
-        상단: 다음 블록 TXs 수 ("TXs" 레이블 + 숫자)
-        하단: 미확인 TXs 수 (숫자)
-    """
     fees_dict = get_recommended_fees()
     next_block_dict = get_next_block_info()
     unconfirmed_txs = get_unconfirmed_txs()
+    display_background_image('TxsBG.png')
 
     high = int(fees_dict['fastestFee'])
     low = int(fees_dict['hourFee'])
 
-    # 배경: 진한 보라
-    clear_screen(BG_DARK)
-    d = ImageDraw.Draw(screen_buffer)
+    # TxsBG layout (128x160 after rotate 270):
+    #   Right column boxes: x=80~127
+    #     Top box:    y=2~75  → fee numbers go here
+    #     Bottom box: y=80~158 → fee numbers go here
+    #   Left area: x=0~70
+    #     TXS label: x=46~62, y=14~48
+    #     Icons:     x=9~16,  y=6~57
+    #     Unconfirmed txs: x=7 (left edge), y=0~79
+    #     Next block txs:  x=43, y=67
 
-    # 우측 열: y=82~159 영역
-    # 수수료 박스 2개 그리기
-    box_x1, box_x2 = 80, 127
-    box_top_y1, box_top_y2 = 2, 77      # 상단 박스
-    box_bot_y1, box_bot_y2 = 82, 157    # 하단 박스
-    d.rectangle((box_x1, box_top_y1, box_x2, box_top_y2),
-                outline=COL_WHITE, fill=(40, 20, 100))
-    d.rectangle((box_x1, box_bot_y1, box_x2, box_bot_y2),
-                outline=COL_WHITE, fill=(40, 20, 100))
+    def fee_font_size(n):
+        # Max width inside box ~45px, height ~73px
+        if n == 1: return 60
+        if n == 2: return 43
+        return int(86 / n)
 
-    # 수수료 숫자: 박스 내부 중앙
-    # 상단 박스 높이 ~75px, 너비 ~47px
-    low_str = str(low)
-    high_str = str(high)
-    low_fs = fit_font_size(low_str, 70, min_size=16, max_size=60)
-    high_fs = fit_font_size(high_str, 70, min_size=16, max_size=60)
+    low_fs = fee_font_size(len(str(low)))
+    high_fs = fee_font_size(len(str(high)))
 
-    # 상단 박스 수수료: y 중앙 = (2+77)//2 = 39
-    low_w, _ = text_size(low_str, pf(low_fs))
-    low_y = box_top_y1 + (box_top_y2 - box_top_y1 - low_w) // 2
-    draw_rot(screen_buffer, low_str, box_x1 + 2, low_y, pf(low_fs))
+    # Top box: x=82, y=2~75 → center vertically in box
+    draw_left_justified_text(screen_buffer, str(low), 82, 5, 90,
+                             ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", low_fs))
+    # Bottom box: x=82, y=82~158
+    draw_left_justified_text(screen_buffer, str(high), 82, 83, 90,
+                             ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", high_fs))
 
-    # 하단 박스 수수료: y 중앙 = (82+157)//2 = 119
-    high_w, _ = text_size(high_str, pf(high_fs))
-    high_y = box_bot_y1 + (box_bot_y2 - box_bot_y1 - high_w) // 2
-    draw_rot(screen_buffer, high_str, box_x1 + 2, high_y, pf(high_fs))
+    # Next block txs count: left area, below TXS label
+    txs = int(next_block_dict['nTx'])
+    txs_fs = int(112 / len(str(txs))) if len(str(txs)) > 4 else 28
+    draw_left_justified_text(screen_buffer, str(txs), 43, 67, 90,
+                             ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", txs_fs))
 
-    # 좌측 영역: y=0~80
-    # 좌측 상단 영역 (x=43~78): 다음 블록 TXs
-    draw_rot(screen_buffer, "TXs", 62, 4, pf(11), fill=COL_GRAY)
-    txs_str = str(int(next_block_dict['nTx']))
-    txs_fs = fit_font_size(txs_str, 74, min_size=14, max_size=30)
-    draw_rot_centered_y(screen_buffer, txs_str, 43, pf(txs_fs))
-
-    # 좌측 하단 영역 (x=5~40): 미확인 TXs
-    u_fs = fit_font_size(unconfirmed_txs, 74, min_size=12, max_size=26)
-    draw_rot_centered_y(screen_buffer, unconfirmed_txs, 7, pf(u_fs))
-    draw_rot(screen_buffer, "unconf", 5, 4, pf(8), fill=COL_GRAY)
+    # Unconfirmed txs: far left
+    u_n = len(unconfirmed_txs)
+    u_fs = int(120 / u_n) if u_n > 5 else 24
+    draw_left_justified_text(screen_buffer, unconfirmed_txs, 7, 64, 90,
+                             ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", u_fs))
 
 
 def draw_screen3():
@@ -1050,174 +895,147 @@ def draw_screen4():
 
 
 def draw_screen5():
-    """네트워크 화면 - 코드 기반 2x2 그리드 레이아웃.
+    display_background_image('network.png')
 
-    참고 사이트 레이아웃:
-      제목: "Network" (상단)
-      2x2 그리드:
-        좌상: Connections / 11 Peers
-        우상: Mempool / 816 KB
-        좌하: Hashrate / 240 EH/S
-        우하: Blockchain / 457 GB
-    """
-    clear_screen(BG_BLUE)
+    # network.png layout (128x160 after rotate 270):
+    #   "Network" label:      x=108~119, y=8~79 (top-right)
+    #   "Connections" label:  x=87~93,   y=9~138 (top+bottom right-mid)
+    #   "Hashrate" label:     x=40~46,   y=8~147 (top+bottom left-mid)
+    #   "Blockchain" label:   x=40~46,   y=89~147 (bottom left-mid)
+    #   "Mempool" label:      x=87~93,   y=89~138 (bottom right-mid)
+    #
+    #   Numbers go in the EMPTY space to the LEFT of each label:
+    #   Connections (top):    x=60~85, y=center around 40
+    #   Mempool (bottom):     x=60~85, y=center around 120
+    #   Hashrate (top):       x=20~38, y=center around 40
+    #   Blockchain (bottom):  x=20~38, y=center around 120
+    #   Unit labels go further left of the numbers
 
-    # 제목 "Network" - 오른쪽 (x=110~124)
-    draw_rot(screen_buffer, "Network", 110, 4, pf(13))
+    # Font definitions
+    # Pixel analysis: labels at x=87~97 (right col), x=40~50 (left col)
+    # Values go LEFT of labels: right col x=60~85, left col x=10~38
+    # y=0~79 (left half of landscape = upper half), y=80~159 (lower half)
+    # Verified coords: x=65(val), x=53(unit), y=15(upper), y=95(lower)
+    val_font_lg = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 18)
+    val_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 14)
+    unit_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 9)
 
-    # 구분선: 가로 (x=64), 세로 (y=80)
-    draw_divider_h(screen_buffer, 64, color=(50, 50, 110))
-    draw_divider_v(screen_buffer, 80, color=(50, 50, 110))
+    # Connections (top-right area): x=65, y=15 (upper half, right col)
+    conn = get_connection_count()
+    conn_str = str(conn)
+    draw_left_justified_text(screen_buffer, conn_str, 65, 15, 90, val_font_lg)
 
-    # 데이터 가져오기
-    conn_str = str(get_connection_count())
+    # Mempool (bottom-right area): x=65, y=95 (lower half, right col)
     mem = get_mempool_info()
+    mem_val, mem_unit = mem.split()[0], mem.split()[1]
+    draw_left_justified_text(screen_buffer, mem_val, 65, 95, 90, val_font)
+    draw_left_justified_text(screen_buffer, mem_unit, 53, 105, 90, unit_font)
+
+    # Hashrate (top-left area): x=25, y=15 (upper half, left col)
     hr = get_network_hash_ps()
+    hr_val, hr_unit = hr.split()[0], hr.split()[1]
+    draw_left_justified_text(screen_buffer, hr_val, 25, 15, 90, val_font)
+    draw_left_justified_text(screen_buffer, hr_unit, 13, 10, 90, unit_font)
+
+    # Blockchain size (bottom-left area): x=25, y=95 (lower half, left col)
     bs = get_blockchain_size()
-
-    mem_parts = mem.split()
-    hr_parts = hr.split()
-    bs_parts = bs.split()
-
-    mem_val  = mem_parts[0] if mem_parts else "?"
-    mem_unit = mem_parts[1] if len(mem_parts) > 1 else ""
-    hr_val   = hr_parts[0]  if hr_parts  else "?"
-    hr_unit  = hr_parts[1]  if len(hr_parts) > 1  else ""
-    bs_val   = bs_parts[0]  if bs_parts  else "?"
-    bs_unit  = bs_parts[1]  if len(bs_parts) > 1  else ""
-
-    # 각 셀의 y 중앙 (0~79 왼쪽 열, 80~159 오른쪽 열)
-    y_L = 40   # 왼쪽 열 중앙
-    y_R = 120  # 오른쪽 열 중앙
-
-    # 2x2 그리드:
-    #   상단행 (x_label=88, x_val=66): Connections, Mempool
-    #   하단행 (x_label=44, x_val=22): Hashrate, Blockchain
-    draw_grid_cell(screen_buffer, "Connections", conn_str, "Peers",
-                   x_label=88, x_val=66, y_center=y_L)
-    draw_grid_cell(screen_buffer, "Mempool",     mem_val,  mem_unit,
-                   x_label=88, x_val=66, y_center=y_R)
-    draw_grid_cell(screen_buffer, "Hashrate",    hr_val,   hr_unit,
-                   x_label=44, x_val=22, y_center=y_L)
-    draw_grid_cell(screen_buffer, "Blockchain",  bs_val,   bs_unit,
-                   x_label=44, x_val=22, y_center=y_R)
+    bs_val, bs_unit = bs.split()[0], bs.split()[1]
+    draw_left_justified_text(screen_buffer, bs_val, 25, 95, 90, val_font)
+    draw_left_justified_text(screen_buffer, bs_unit, 13, 105, 90, unit_font)
 
 
 def draw_screen6():
-    """페이먼트 채널 화면 - 코드 기반 2x2 그리드 레이아웃.
-
-    참고 사이트 레이아웃:
-      제목: "Payment Channels" (상단)
-      2x2 그리드:
-        좌상: Connections / 5 Peers
-        우상: Active / 0 Channels
-        좌하: Max Send / 0 Sats
-        우하: Max Receive / 0 Sats
-    """
-    clear_screen(BG_DARK)
-
-    # 제목 "Payment Channels" - 오른쪽 (x=110~124)
-    draw_rot(screen_buffer, "Payment Channels", 110, 4, pf(10))
-
-    # 구분선: 가로 (x=64), 세로 (y=80)
-    draw_divider_h(screen_buffer, 64, color=(50, 50, 110))
-    draw_divider_v(screen_buffer, 80, color=(50, 50, 110))
-
-    # 데이터 가져오기
+    display_background_image('payment_channels.png')
     result = get_lnd_info()
-    connections = str(result[0]) if result else "--"
-    active_channels = str(result[1]) if result else "--"
+    if not result:
+        return
+    connections, active_channels = result
 
-    bal = get_lnd_channel_balance() if result else None
-    if bal:
-        max_send, max_receive = bal
-        send_parts = max_send.split()
-        recv_parts = max_receive.split()
-        send_val  = send_parts[0] if send_parts else "0"
-        send_unit = send_parts[1] if len(send_parts) > 1 else "Sats"
-        recv_val  = recv_parts[0] if recv_parts else "0"
-        recv_unit = recv_parts[1] if len(recv_parts) > 1 else "Sats"
-    else:
-        send_val, send_unit = "--", "Sats"
-        recv_val, recv_unit = "--", "Sats"
+    # payment_channels.png layout (128x160 after rotate 270):
+    #   "Payment Channels" label: x=111~121, y=6~151 (rightmost)
+    #   "Connections" label:      x=89~96,   y=7~135 (top, right-mid)
+    #   "Active" label:           x=89~96,   y=101~135 (bottom, right-mid)
+    #   "Max Send" label:         x=41~47,   y=7~154 (top, left-mid)
+    #   "Max Receive" label:      x=41~47,   y=82~154 (bottom, left-mid)
+    #
+    #   Numbers go LEFT of each label:
+    #   Connections (top):    x=60~87, y=center around 40
+    #   Active (bottom):      x=60~87, y=center around 120
+    #   Max Send (top):       x=20~39, y=center around 40
+    #   Max Receive (bottom): x=20~39, y=center around 120
 
-    # 각 셀의 y 중앙
-    y_L = 40
-    y_R = 120
+    # Font definitions
+    # Pixel analysis: labels at x=89~96 (right col), x=41~47 (left col)
+    # Values go LEFT of labels: right col x=65~87, left col x=10~39
+    # y=0~79 (upper half), y=80~159 (lower half)
+    # Verified coords: x=65(val), x=53(unit), y=15(upper), y=95(lower)
+    val_font_lg = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 18)
+    val_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 14)
+    btc_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 9)
 
-    # 2x2 그리드:
-    #   상단행 (x_label=88, x_val=66): Connections, Active
-    #   하단행 (x_label=44, x_val=22): Max Send, Max Receive
-    draw_grid_cell(screen_buffer, "Connections", connections,     "Peers",
-                   x_label=88, x_val=66, y_center=y_L)
-    draw_grid_cell(screen_buffer, "Active",      active_channels, "Channels",
-                   x_label=88, x_val=66, y_center=y_R)
-    draw_grid_cell(screen_buffer, "Max Send",    send_val,        send_unit,
-                   x_label=44, x_val=22, y_center=y_L)
-    draw_grid_cell(screen_buffer, "Max Receive", recv_val,        recv_unit,
-                   x_label=44, x_val=22, y_center=y_R)
+    # Connections (top-right area): x=65, y=15 (upper half)
+    draw_left_justified_text(screen_buffer, str(connections), 65, 15, 90, val_font_lg)
+
+    # Active channels (bottom-right area): x=65, y=95 (lower half)
+    draw_left_justified_text(screen_buffer, str(active_channels), 65, 95, 90, val_font_lg)
+
+    bal = get_lnd_channel_balance()
+    if not bal:
+        return
+    max_send, max_receive = bal
+    send_val, send_unit = max_send.split()[0], max_send.split()[1]
+    recv_val, recv_unit = max_receive.split()[0], max_receive.split()[1]
+
+    # Max Send (top-left area): x=25, y=15 (upper half)
+    draw_left_justified_text(screen_buffer, send_val, 25, 15, 90, val_font)
+    draw_left_justified_text(screen_buffer, send_unit, 13, 10, 90, btc_font)
+
+    # Max Receive (bottom-left area): x=25, y=95 (lower half)
+    draw_left_justified_text(screen_buffer, recv_val, 25, 95, 90, val_font)
+    draw_left_justified_text(screen_buffer, recv_unit, 13, 105, 90, btc_font)
 
 
 def draw_screen7():
-    """스토리지 화면 - 코드 기반 레이아웃.
-
-    참고 사이트 레이아웃:
-      제목: "Storage" + 플로피디스크 아이콘 (오른쪽 상단)
-      큰 숫자: "565.2 GB" (중앙)
-      소형: "Used out of 965.2 GB"
-      진행바: 가로 바 (하단)
-      소형: "418.2 GB available"
-    """
-    clear_screen(BG_DARK)
-
+    display_background_image('storage.png')
     storage_info = get_disk_storage_info()
     if not storage_info:
-        draw_rot_centered_y(screen_buffer, "Storage", 50, pf(18))
-        draw_rot_centered_y(screen_buffer, "No data", 30, pf(12), fill=COL_GRAY)
         return
 
     used_space, disk_capacity, available_space, used_pct = (
         storage_info[1], storage_info[0], storage_info[2], storage_info[3])
 
-    # 제목 "Storage" - 오른쪽 (x=110~124)
-    draw_rot(screen_buffer, "Storage", 110, 4, pf(13))
+    # storage.png layout (128x160 after rotate 270):
+    #   "Storage" label:  x=105~120, y=6~149 (rightmost)
+    #   Storage icon:     x=85~105,  y=109~149 (bottom-right)
+    #   Left area x=0~100 is available for text
+    #
+    #   Layout plan (x = row position from top, y = horizontal position):
+    #   Row 1 (x=70~90):  Used space large text (e.g. "450 GB")
+    #   Row 2 (x=52~68):  "Used out of 2TB" small text
+    #   Row 3 (x=35~50):  "1.5TB available" small text
+    #   Progress bar (x=28~32): vertical bar spanning y=7~153
 
-    # 아이콘: storage.png는 배경 이미지이므로 사용 불가 (전체 화면이 로드됨)
-    # 대신 플로피디스크 심볼을 텍스트로 표시
-    draw_rot(screen_buffer, "[=]", 86, 110, pf(18), fill=COL_GRAY)
+    draw_left_justified_text(screen_buffer, used_space, 70, 7, 90,
+                             ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 20))
+    draw_left_justified_text(screen_buffer, "Used out of " + disk_capacity, 52, 7, 90,
+                             ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 11))
+    draw_left_justified_text(screen_buffer, available_space + " available", 35, 7, 90,
+                             ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 11))
 
-    # 큰 숫자: 사용량 (x=60~84), y축 중앙
-    # max_size=24로 제한하여 제목 영역을 침범하지 않게 함
-    used_fs = fit_font_size(used_space, 150, min_size=16, max_size=24)
-    draw_rot_centered_y(screen_buffer, used_space, 60, pf(used_fs))
-
-    # 중간 텍스트: "Used out of X" (x=44~58)
-    out_of_str = "Used out of " + disk_capacity
-    out_fs = fit_font_size(out_of_str, 150, min_size=8, max_size=12)
-    draw_rot_centered_y(screen_buffer, out_of_str, 44, pf(out_fs), fill=COL_GRAY)
-
-    # 진행바: 가로 바 (x=30~38), y=4~155
-    d = ImageDraw.Draw(screen_buffer)
-    bar_x, bar_y = 30, 4
-    bar_h, bar_w = 151, 8
-    # 배경바 (흰색)
-    d.rectangle((bar_x, bar_y, bar_x + bar_w, bar_y + bar_h),
-                outline=COL_WHITE, fill=(60, 60, 80))
-    # 사용량 (녹색)
-    used_h = int((used_pct * bar_h) / 100)
-    d.rectangle((bar_x, bar_y, bar_x + bar_w, bar_y + used_h),
-                fill=COL_GREEN)
-
-    # 사용 가능 텍스트: "X available" (x=14~28)
-    avail_str = available_space + " available"
-    avail_fs = fit_font_size(avail_str, 150, min_size=8, max_size=12)
-    draw_rot_centered_y(screen_buffer, avail_str, 14, pf(avail_fs), fill=COL_GREEN)
+    # Vertical progress bar: x=28~30, y=7~153
+    draw_sb = ImageDraw.Draw(screen_buffer)
+    bar_x, bar_y, bar_w, bar_h = 28, 7, 2, 146
+    inner_h = int((used_pct * bar_h) / 100) + bar_y
+    draw_sb.rectangle((bar_x, bar_y, bar_x + bar_w, bar_y + bar_h),
+                      outline=(255, 255, 255), fill=(255, 255, 255))
+    draw_sb.rectangle((bar_x, bar_y, bar_x + bar_w, inner_h),
+                      outline=(0, 160, 0), fill=(0, 160, 0))
 
 
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
-print('Running Umbrel LCD script - Version: 2.15.0 (Umbrel 1.x compatible)')
+print('Running Umbrel LCD script - Version: 2.14.8 (Umbrel 1.x compatible)')
 
 # Display umbrel logo on startup (duration configurable in config.ini)
 display_background_image('umbrel_logo.png')
