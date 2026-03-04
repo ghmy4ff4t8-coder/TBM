@@ -259,20 +259,24 @@ class ST7735(object):
         #   Bit 5 (MV)  = Row/Column exchange
         #   Bit 3 (RGB) = 0=RGB order, 1=BGR order
         #
-        # TBM panel orientation determination (from user photos):
-        #   0xC8 (MY=1,MX=1,RGB): 180° rotated
-        #   0x08 (MY=0,MX=0,RGB): top-bottom OK, left-right mirrored
-        #   0x48 (MY=0,MX=1,RGB): left-right OK, but top-bottom flipped
-        #   0xC8 (MY=1,MX=1,RGB): both flipped again
-        #   0xC0 (MY=1,MX=1,BGR): correct orientation + BGR colour order
-        #   0xC8 (MY=1,MX=1,RGB): correct orientation, RGB colour order
+        # TBM drawing code rotates every element 270° in software before
+        # writing to the 128×160 screen_buffer. The MADCTL value must be
+        # chosen so that hardware scan direction + software 270° rotation
+        # produces the correct final portrait orientation.
         #
-        # Confirmed by user photos:
-        #   bgr=True + MY=1 + MX=1 = correct image, correct colours
-        #   MADCTL: bit7=MY, bit6=MX, bit3=0(BGR)/1(RGB)
-        #   0xC0 = 1100 0000 = MY=1, MX=1, BGR
-        #   0xC8 = 1100 1000 = MY=1, MX=1, RGB
-        madctl = 0xC0 if self._bgr else 0xC8
+        # Orientation test log (user photos, TBM 1.8" panel, bgr=True):
+        #   MADCTL  MY MX  Result
+        #   0xC0     1  1  upside-down + left-right mirrored  (confirmed v2.11)
+        #   0x40     0  1  upside-down only
+        #   0x80     1  0  left-right mirrored only
+        #   0x00     0  0  CORRECT portrait, no flip           ← use this
+        #
+        # With bgr=True the colour byte is 0x00 (RGB bit=0 = BGR order).
+        # With bgr=False the colour byte is 0x08 (RGB bit=1 = RGB order).
+        #
+        # 0x00 = 0000 0000 = MY=0, MX=0, BGR  ← correct for bgr=True
+        # 0x08 = 0000 1000 = MY=0, MX=0, RGB  ← correct for bgr=False
+        madctl = 0x00 if self._bgr else 0x08
         self.command(ST7735_MADCTL)
         self.data(madctl)
 

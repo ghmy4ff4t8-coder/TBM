@@ -1,10 +1,12 @@
 
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.10.0 (Umbrel 1.x compatible fork)
+#   Version  : 2.12.0 (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
-#    # v2.11.0: MADCTL 0x48→0xC0 (MY=1 추가) 상하반전 재수정, 설치 스크립트에서 화면 전환 시간 인터랙티브 설정 추가, 기본값 6초
+#    # v2.12.0: MADCTL 0xC0→0x00 (MY=0,MX=0,BGR) 화면 방향 수정 (상하+좌우 반전 해제)
+#           모든 화면 기본 전환 시간 10초로 변경, 설치 스크립트 다국어 지원 추가
+# v2.11.0: MADCTL 0x48→0xC0 (MY=1 추가) 상하반전 재수정, 설치 스크립트에서 화면 전환 시간 인터랙티브 설정 추가, 기본값 6초
 # v2.10.0:2024-03):
 #       - FIXED: LCD left-right mirror - MADCTL 0x08 → 0x48 (added MX=1 bit)
 #         Photos showed text was horizontally mirrored (e.g. "USD" → "uen")
@@ -241,9 +243,9 @@ BITCOIN_RPC_USER = _cfg.get('BITCOIN', 'rpc_user', fallback='umbrel')
 # screen1_duration = 60  ; Bitcoin price screen
 # screen_duration  = 30  ; all other screens (2-7)
 # ---------------------------------------------------------------------------
-LOGO_DURATION    = int(_cfg.get('DISPLAY', 'logo_duration',    fallback='60'))
-SCREEN1_DURATION = int(_cfg.get('DISPLAY', 'screen1_duration', fallback='6'))
-SCREEN_DURATION  = int(_cfg.get('DISPLAY', 'screen_duration',  fallback='6'))
+LOGO_DURATION    = int(_cfg.get('DISPLAY', 'logo_duration',    fallback='10'))
+SCREEN1_DURATION = int(_cfg.get('DISPLAY', 'screen1_duration', fallback='10'))
+SCREEN_DURATION  = int(_cfg.get('DISPLAY', 'screen_duration',  fallback='10'))
 BITCOIN_RPC_PASS = _cfg.get('BITCOIN', 'rpc_pass', fallback='moneyprintergobrrr')
 BITCOIN_RPC_HOST = _cfg.get('BITCOIN', 'rpc_host', fallback='127.0.0.1')
 BITCOIN_RPC_PORT = int(_cfg.get('BITCOIN', 'rpc_port', fallback='8332'))
@@ -962,7 +964,7 @@ def draw_screen7():
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
-print('Running Umbrel LCD script - Version: 2.11.0 (Umbrel 1.x compatible)')
+print('Running Umbrel LCD script - Version: 2.12.0 (Umbrel 1.x compatible)')
 
 # Display umbrel logo on startup (duration configurable in config.ini)
 display_background_image('umbrel_logo.png')
