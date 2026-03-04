@@ -1,9 +1,15 @@
 
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.5.0  (Umbrel 1.x compatible fork)
+#   Version  : 2.6.0  (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
+#     v2.6.0 (2024-03):
+#       - FIXED: Stripe noise by bypassing pimoroni's display() entirely.
+#         New lcd_display() function converts PIL image to RGB565 bytes
+#         directly (no numpy rot90) and calls disp.set_window() + disp.data()
+#         directly. This eliminates all stride/shape mismatch issues.
+#
 #     v2.5.0 (2024-03):
 #       - FIXED: Diagonal stripe / sline noise caused by SPI stride mismatch.
 #
@@ -124,16 +130,10 @@ SPI_DEVICE = 0   # CE0
 #     ST7735 internal memory is 132 cols × 162 rows.
 #     For a 128×160 panel: offset_left=(132-128)//2=2, offset_top=(162-160)//2=1
 #
-#   rotation=90
-#     pimoroni v1.0.0 image_to_data() applies np.rot90(array, rotation//90).
-#     The PIL buffer is shape (160, 128, 3). With rotation=0 the shape stays
-#     (160, 128, 3) and the byte stream has 160 rows × 128 pixels — but the
-#     ST7735 MADCTL=0xC0 scans in landscape, so each 'row' maps to a physical
-#     column, producing diagonal stripes.
-#     With rotation=90: np.rot90 gives shape (128, 160, 3) — 128 rows × 160
-#     pixels — which matches the landscape scan direction perfectly.
-#     The original drawing code already rotates each element 270°, so the net
-#     rotation is 270° + 90° = 360° = correct portrait orientation.
+#   rotation=0
+#     We set rotation=0 here to prevent the library's image_to_data() from
+#     applying any np.rot90() transformation. We handle all pixel ordering
+#     ourselves in the custom lcd_display() function below.
 #
 #   bgr=False
 #     Generic ST7735 128×160 panels are usually RGB order.
@@ -149,7 +149,7 @@ disp = TFT.ST7735(
     rst=RST,
     width=128,
     height=160,
-    rotation=90,
+    rotation=0,
     offset_left=2,
     offset_top=1,
     spi_speed_hz=SPEED_HZ,
@@ -159,6 +159,47 @@ disp = TFT.ST7735(
 
 # Initialize display.
 disp.begin()
+
+
+# ---------------------------------------------------------------------------
+# Custom display function - bypasses pimoroni's image_to_data() entirely.
+#
+# The pimoroni library's display() calls image_to_data(image, self._rotation)
+# which applies np.rot90(). This causes stride mismatches because:
+#   - set_window() uses self._width=128 and self._height=160 for CASET/RASET
+#   - np.rot90 changes the array shape, so the byte count no longer matches
+#     the CASET/RASET window, producing diagonal or vertical stripe noise.
+#
+# This function bypasses all of that:
+#   1. Converts the PIL image directly to RGB565 bytes using struct.pack
+#      (no numpy, no rot90, no shape changes)
+#   2. Calls disp.set_window() to set the correct CASET/RASET window
+#   3. Calls disp.data() to write the raw bytes directly to the LCD RAM
+#
+# The screen_buffer is 128×160 pixels. Each element is drawn with a 270°
+# rotation already applied, so the buffer is in the correct final orientation
+# for the physical LCD. We just need to send it as-is.
+# ---------------------------------------------------------------------------
+import struct
+import numpy as np
+
+def lcd_display(image):
+    """Send a PIL Image directly to the ST7735 LCD, bypassing pimoroni's
+    internal np.rot90 transformation."""
+    # Convert to RGB and get raw pixel data as a flat list of (r, g, b) tuples
+    rgb = image.convert('RGB')
+    pixels = list(rgb.getdata())   # list of (r, g, b) tuples, row-major
+
+    # Pack as RGB565 big-endian
+    data = []
+    for r, g, b in pixels:
+        c = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3)
+        data.append((c >> 8) & 0xFF)
+        data.append(c & 0xFF)
+
+    # Set the address window and write
+    disp.set_window()
+    disp.data(data)
 
 # ---------------------------------------------------------------------------
 # Off-screen image buffer.
@@ -866,11 +907,11 @@ def draw_screen7():
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
-print('Running Umbrel LCD script Version 2.5.0 (Umbrel 1.x compatible)')
+print('Running Umbrel LCD script Version 2.6.0 (Umbrel 1.x compatible)')
 
 # Display umbrel logo for 60 seconds on startup
 display_background_image('umbrel_logo.png')
-disp.display(screen_buffer)
+lcd_display(screen_buffer)
 time.sleep(60)
 
 tor_status = get_tor_status()
@@ -885,7 +926,7 @@ while True:
         print(f"current_mempool_url = {mempool_url}")
         if "Screen1" in userScreenChoices:
             draw_screen1(currency)
-            disp.display(screen_buffer)
+            lcd_display(screen_buffer)
             time.sleep(60)
     except Exception as e:
         print("Error showing screen1;", str(e))
@@ -893,7 +934,7 @@ while True:
     try:
         if "Screen2" in userScreenChoices:
             draw_screen2()
-            disp.display(screen_buffer)
+            lcd_display(screen_buffer)
             time.sleep(30)
     except Exception as e:
         print("Error showing screen2;", str(e))
@@ -901,7 +942,7 @@ while True:
     try:
         if "Screen3" in userScreenChoices:
             draw_screen3()
-            disp.display(screen_buffer)
+            lcd_display(screen_buffer)
             time.sleep(30)
     except Exception as e:
         print("Error showing screen3;", str(e))
@@ -909,7 +950,7 @@ while True:
     try:
         if "Screen4" in userScreenChoices:
             draw_screen4()
-            disp.display(screen_buffer)
+            lcd_display(screen_buffer)
             time.sleep(30)
     except Exception as e:
         print("Error showing screen4;", str(e))
@@ -917,7 +958,7 @@ while True:
     try:
         if "Screen5" in userScreenChoices:
             draw_screen5()
-            disp.display(screen_buffer)
+            lcd_display(screen_buffer)
             time.sleep(30)
     except Exception as e:
         print("Error showing screen5;", str(e))
@@ -925,7 +966,7 @@ while True:
     try:
         if "Screen6" in userScreenChoices:
             draw_screen6()
-            disp.display(screen_buffer)
+            lcd_display(screen_buffer)
             time.sleep(30)
     except Exception as e:
         print("Error showing screen6;", str(e))
@@ -933,7 +974,7 @@ while True:
     try:
         if "Screen7" in userScreenChoices:
             draw_screen7()
-            disp.display(screen_buffer)
+            lcd_display(screen_buffer)
             time.sleep(30)
     except Exception as e:
         print("Error showing screen7;", str(e))
