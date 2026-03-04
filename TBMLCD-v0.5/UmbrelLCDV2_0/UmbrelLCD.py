@@ -4,6 +4,15 @@
 #   Version  : 2.2.0  (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
+#     v2.3.0 (2024-03):
+#       - FIXED: LCD noisy/garbled display - pimoroni/st7735-python v1.0.0
+#         default width=80 (Pimoroni 0.96" product) does NOT match TBM 1.8"
+#         LCD (128x160). Must explicitly set width=128, height=160, and
+#         offset_left=2, offset_top=1 to match the ST7735 memory map.
+#         Without this, the CASET/RASET window is wrong -> noise/garbage.
+#       - FIXED: rotation parameter: pimoroni v1.0.0 default is rotation=90
+#         (for landscape). TBM uses portrait (rotation=0) but image_to_data()
+#         now applies rotation internally, so set rotation=0 here.
 #     v2.2.0 (2024-03):
 #       - FIXED: ST7735.__init__() TypeError - pimoroni/st7735-python v1.0.0
 #         changed API completely:
@@ -78,18 +87,35 @@ SPI_DEVICE = 0   # CE0 = cs=0
 
 # Create TFT LCD display class.
 # pimoroni/st7735-python v1.0.0 API changes:
-#   - 'rgb' parameter is now 'bgr' (True = BGR colour order, which is the default for most ST7735 panels)
+#   - 'rgb' parameter is now 'bgr' (True = BGR colour order)
 #   - 'dc' and 'rst' now accept strings like "GPIO24", not integers
 #   - 'cs' is the SPI chip-select number (0 or 1), not a GPIO pin
 #   - 'disp.buffer' no longer exists; create your own PIL Image and pass to disp.display(image)
+#
+# CRITICAL for TBM 1.8" LCD (128x160):
+#   - width=128, height=160 MUST be set explicitly.
+#     The library default is width=80 (for Pimoroni's own 0.96" display).
+#     Using width=80 on a 128-pixel-wide panel causes the CASET address window
+#     to be wrong, resulting in a noisy/garbled display.
+#   - offset_left=2, offset_top=1 are the correct offsets for the ST7735
+#     memory map when driving a 128x160 panel (COLS=132, ROWS=162):
+#       offset_left = (132 - 128) // 2 = 2
+#       offset_top  = (162 - 160) // 2 = 1
+#   - rotation=0 for portrait orientation (TBM mounts the LCD in portrait).
+#     image_to_data() in the library applies np.rot90 internally.
+#   - bgr=False for this panel (most generic ST7735 128x160 panels are RGB)
 disp = TFT.ST7735(
     port=SPI_PORT,
     cs=SPI_DEVICE,
     dc=DC,
     rst=RST,
+    width=128,
+    height=160,
     rotation=0,
+    offset_left=2,
+    offset_top=1,
     spi_speed_hz=SPEED_HZ,
-    bgr=True,
+    bgr=False,
     invert=False
 )
 
