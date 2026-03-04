@@ -1,9 +1,23 @@
 
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.6.0  (Umbrel 1.x compatible fork)
+#   Version  : 2.7.0  (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
+#     v2.7.0 (2024-03):
+#       - FIXED: Root cause of all stripe/noise issues identified and resolved.
+#         Replaced pimoroni/st7735-python with bundled st7735_tbm.py driver.
+#
+#         Root cause: pimoroni library defines ST7735_COLS=132, ST7735_ROWS=162
+#         (for their own 0.96" display), giving offset_left=2, offset_top=1.
+#         The TBM 1.8" panel uses ST7735_COLS=128, ST7735_ROWS=160, so
+#         offset_left=0, offset_top=0. The 2-pixel column offset caused the
+#         CASET window to be misaligned, producing the diagonal stripe pattern.
+#
+#         st7735_tbm.py is a direct port of doido-technologies/st7735-python
+#         (v0.0.4.doidotech) with RPi.GPIO replaced by gpiod + spidev.
+#         It uses the correct MADCTL=0xC8 and offset_left=0, offset_top=0.
+#
 #     v2.6.0 (2024-03):
 #       - FIXED: Stripe noise by bypassing pimoroni's display() entirely.
 #         New lcd_display() function converts PIL image to RGB565 bytes
@@ -86,9 +100,16 @@ from PIL import ImageDraw
 from PIL import ImageFont
 import time
 import datetime
+import numpy as np
 
-# pimoroni/st7735-python v1.0.0 uses lowercase module name
-import st7735 as TFT
+# ---------------------------------------------------------------------------
+# Use the bundled st7735_tbm driver instead of pimoroni/st7735-python.
+# This driver is a direct port of the doido-technologies original library
+# (v0.0.4.doidotech) with RPi.GPIO replaced by gpiod + spidev.
+# It uses the correct MADCTL=0xC8, offset_left=0, offset_top=0 values
+# for the TBM 1.8" 128x160 panel.
+# ---------------------------------------------------------------------------
+from st7735_tbm import ST7735
 
 import urllib.request as urlreq
 import certifi
@@ -106,100 +127,38 @@ import requests
 
 WIDTH = 128
 HEIGHT = 160
-SPEED_HZ = 4000000
+SPEED_HZ = 16000000
 
-
-# Raspberry Pi configuration.
-# pimoroni/st7735-python v1.0.0 requires GPIO pin numbers as strings.
-# Use "GPIO24" format (BCM numbering) or "PIN18" format (physical pin numbering).
-DC  = "GPIO24"   # BCM 24 = physical Pin 18
-RST = "GPIO25"   # BCM 25 = physical Pin 22
+# Raspberry Pi pin configuration (BCM numbering, integers).
+# These match the original doido-technologies wiring for TBM.
+DC         = 24   # BCM 24 = physical Pin 18
+RST        = 25   # BCM 25 = physical Pin 22
 SPI_PORT   = 0
-SPI_DEVICE = 0   # CE0
+SPI_DEVICE = 0    # CE0
 
 # ---------------------------------------------------------------------------
-# ST7735 initialisation for TBM 1.8" 128x160 panel
+# Initialise the ST7735 display using the bundled TBM driver.
+# offset_left=0, offset_top=0 because the doido-technologies library uses
+# ST7735_COLS=128 and ST7735_ROWS=160 (same as the panel), so no offset
+# is needed. This is the key difference from pimoroni (which uses 132x162).
 # ---------------------------------------------------------------------------
-# KEY PARAMETERS explained:
-#
-#   width=128, height=160
-#     MUST be set explicitly. Library default is width=80 (Pimoroni 0.96").
-#     Wrong width causes CASET address window mismatch → noisy display.
-#
-#   offset_left=2, offset_top=1
-#     ST7735 internal memory is 132 cols × 162 rows.
-#     For a 128×160 panel: offset_left=(132-128)//2=2, offset_top=(162-160)//2=1
-#
-#   rotation=0
-#     We set rotation=0 here to prevent the library's image_to_data() from
-#     applying any np.rot90() transformation. We handle all pixel ordering
-#     ourselves in the custom lcd_display() function below.
-#
-#   bgr=False
-#     Generic ST7735 128×160 panels are usually RGB order.
-#     If colours look wrong (e.g. blue sky appears red), change to bgr=True.
-#
-#   invert=False
-#     TBM panel does not need colour inversion.
-# ---------------------------------------------------------------------------
-disp = TFT.ST7735(
+disp = ST7735(
     port=SPI_PORT,
     cs=SPI_DEVICE,
     dc=DC,
     rst=RST,
     width=128,
     height=160,
-    rotation=0,
-    offset_left=2,
-    offset_top=1,
+    offset_left=0,
+    offset_top=0,
     spi_speed_hz=SPEED_HZ,
-    bgr=False,
     invert=False
 )
 
-# Initialize display.
-disp.begin()
-
-
-# ---------------------------------------------------------------------------
-# Custom display function - bypasses pimoroni's image_to_data() entirely.
-#
-# The pimoroni library's display() calls image_to_data(image, self._rotation)
-# which applies np.rot90(). This causes stride mismatches because:
-#   - set_window() uses self._width=128 and self._height=160 for CASET/RASET
-#   - np.rot90 changes the array shape, so the byte count no longer matches
-#     the CASET/RASET window, producing diagonal or vertical stripe noise.
-#
-# This function bypasses all of that:
-#   1. Converts the PIL image directly to RGB565 bytes using struct.pack
-#      (no numpy, no rot90, no shape changes)
-#   2. Calls disp.set_window() to set the correct CASET/RASET window
-#   3. Calls disp.data() to write the raw bytes directly to the LCD RAM
-#
-# The screen_buffer is 128×160 pixels. Each element is drawn with a 270°
-# rotation already applied, so the buffer is in the correct final orientation
-# for the physical LCD. We just need to send it as-is.
-# ---------------------------------------------------------------------------
-import struct
-import numpy as np
 
 def lcd_display(image):
-    """Send a PIL Image directly to the ST7735 LCD, bypassing pimoroni's
-    internal np.rot90 transformation."""
-    # Convert to RGB and get raw pixel data as a flat list of (r, g, b) tuples
-    rgb = image.convert('RGB')
-    pixels = list(rgb.getdata())   # list of (r, g, b) tuples, row-major
-
-    # Pack as RGB565 big-endian
-    data = []
-    for r, g, b in pixels:
-        c = ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3)
-        data.append((c >> 8) & 0xFF)
-        data.append(c & 0xFF)
-
-    # Set the address window and write
-    disp.set_window()
-    disp.data(data)
+    """Send a PIL Image to the LCD via the bundled st7735_tbm driver."""
+    disp.display(image)
 
 # ---------------------------------------------------------------------------
 # Off-screen image buffer.
@@ -907,7 +866,7 @@ def draw_screen7():
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
-print('Running Umbrel LCD script Version 2.6.0 (Umbrel 1.x compatible)')
+print('Running Umbrel LCD script Version 2.7.0 (Umbrel 1.x compatible)')
 
 # Display umbrel logo for 60 seconds on startup
 display_background_image('umbrel_logo.png')

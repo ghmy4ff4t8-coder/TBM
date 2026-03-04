@@ -1,14 +1,19 @@
 #!/bin/bash
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 1.2.0  (Umbrel 1.x compatible fork)
+#   Version  : 1.3.0  (Umbrel 1.x compatible fork)
 #   Location : github
 #   Changes  :
+#     v1.3.0:
+#       - Removed pimoroni/st7735-python dependency entirely.
+#         The bundled st7735_tbm.py driver is now used instead.
+#         This fixes the diagonal stripe issue caused by pimoroni's
+#         incorrect ST7735_COLS=132 / offset_left=2 values.
+#       - Still installs gpiod + spidev (used by st7735_tbm.py directly)
+#       - Removed gpiodevice (pimoroni-only dependency)
 #     v1.2.0:
 #       - Install pimoroni/st7735-python v1.0.0 via 'pip install st7735'
-#         (the old doido-technologies fork is incompatible with new gpiod API)
-#       - Install gpiod and python3-gpiod for pimoroni st7735 v1.0.0
-#       - Install gpiodevice dependency
+#       - Install gpiod and python3-gpiod
 #     v1.1.0:
 #       - Added --break-system-packages flag for Python 3.11+ compatibility
 #       - Added support for /boot/firmware/config.txt (newer Raspberry Pi OS)
@@ -39,17 +44,16 @@ python3 -m pip install $PIP_FLAGS "requests[socks]" 2>/dev/null || python3 -m pi
 python3 -m pip install $PIP_FLAGS pysocks 2>/dev/null || python3 -m pip install --user pysocks
 # Ensure Pillow >= 10.0.0 is installed (required for textbbox support)
 python3 -m pip install $PIP_FLAGS "Pillow>=10.0.0" 2>/dev/null || python3 -m pip install --user "Pillow>=10.0.0"
-# gpiod Python bindings (required by pimoroni/st7735-python v1.0.0)
+# gpiod Python bindings (required by bundled st7735_tbm.py driver)
 python3 -m pip install $PIP_FLAGS gpiod 2>/dev/null || python3 -m pip install --user gpiod
-python3 -m pip install $PIP_FLAGS gpiodevice 2>/dev/null || python3 -m pip install --user gpiodevice
 python3 -m pip install $PIP_FLAGS spidev 2>/dev/null || python3 -m pip install --user spidev
+# numpy is used by the bundled st7735_tbm.py driver
+python3 -m pip install $PIP_FLAGS numpy 2>/dev/null || python3 -m pip install --user numpy
 
 echo " "
-echo "Installing the ST7735 LCD library (pimoroni/st7735-python v1.0.0)..."
+echo "NOTE: The bundled st7735_tbm.py driver is used (no external ST7735 library needed)."
+echo "      gpiod and spidev are used directly by the bundled driver."
 echo " "
-# Install the official pimoroni st7735 library via pip
-# This replaces the old doido-technologies fork which is no longer compatible
-python3 -m pip install $PIP_FLAGS st7735 2>/dev/null || python3 -m pip install --user st7735
 
 echo " "
 echo "Enabling SPI port..."
