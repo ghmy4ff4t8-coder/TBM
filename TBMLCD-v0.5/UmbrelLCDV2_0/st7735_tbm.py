@@ -11,16 +11,17 @@
 #
 #   Hardware: TBM 1.8" 128×160 ST7735 panel
 #   - ST7735_COLS = 128, ST7735_ROWS = 160  (no offset needed)
-#   - MADCTL = 0x00 (MY=0, MX=0, MV=0, BGR order when bgr=True)
+#   - MADCTL = 0x40 (MY=0, MX=1, MV=0, BGR order when bgr=True)
+#     Confirmed correct for TBM 1.8" panel in v2.10.0.
 #
 #   Display orientation pipeline:
 #   1. UmbrelLCD.py draws all content rotated 270° CCW onto a 128×160 buffer.
-#   2. image_to_data() flips the buffer vertically (top↔bottom) before
-#      converting to RGB565.  This corrects the upside-down output that would
-#      otherwise result from the 270° software rotation with MADCTL=0x00.
-#   3. The corrected RGB565 data is sent to the LCD via SPI.
+#   2. image_to_data() converts the buffer to RGB565 with no additional rotation.
+#   3. MADCTL=0x40 (MX=1) sets the hardware scan direction so that the
+#      270° software rotation produces the correct portrait orientation.
+#   4. The RGB565 data is sent to the LCD via SPI.
 #
-#   Net transform: 270° CCW rotation + vertical flip = correct portrait.
+#   Net transform: 270° CCW software rotation + MADCTL MX=1 = correct portrait.
 # -------------------------------------------------------------------------------
 
 import numbers
@@ -65,12 +66,12 @@ ST7735_GMCTRN1 = 0xE1
 def image_to_data(image):
     """Convert a PIL Image to a flat list of 16-bit RGB565 bytes.
 
-    Applies a vertical flip (top↔bottom) before conversion so that the
-    270° CCW software rotation used by UmbrelLCD.py produces the correct
-    portrait orientation on screen.
+    No rotation is applied here. UmbrelLCD.py rotates all content 270° CCW
+    before writing to the 128×160 buffer, and MADCTL=0x40 (MX=1, BGR) provides
+    the correct hardware scan direction to produce a proper portrait display.
+    This combination was confirmed working in v2.10.0.
     """
     pb = np.array(image.convert('RGB')).astype('uint16')
-    pb = pb[::-1, :, :]          # vertical flip: correct for 270° SW rotation
     color = ((pb[:, :, 0] & 0xF8) << 8) | \
             ((pb[:, :, 1] & 0xFC) << 3) | \
              (pb[:, :, 2] >> 3)
@@ -196,12 +197,13 @@ class ST7735(object):
 
         self.command(ST7735_INVON if self._invert else ST7735_INVOFF)
 
-        # MADCTL: MY=0, MX=0, MV=0
+        # MADCTL: MY=0, MX=1, MV=0
+        # MX=1 (bit 6) = column address right-to-left (corrects left-right mirror)
         # BGR bit (bit 3): 0 = BGR order, 1 = RGB order
-        # bgr=True  → panel uses BGR order → bit3=0 → 0x00
-        # bgr=False → panel uses RGB order → bit3=1 → 0x08
+        # bgr=True  → 0x40 (MX=1, BGR) ← confirmed correct for TBM panel (v2.10.0)
+        # bgr=False → 0x48 (MX=1, RGB)
         self.command(ST7735_MADCTL)
-        self.data(0x00 if self._bgr else 0x08)
+        self.data(0x40 if self._bgr else 0x48)
 
         self.command(ST7735_COLMOD)
         self.data(0x05)                 # 16-bit colour

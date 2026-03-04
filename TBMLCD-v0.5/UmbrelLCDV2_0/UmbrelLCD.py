@@ -1,9 +1,12 @@
 
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.14.0 (Umbrel 1.x compatible fork)
+#   Version  : 2.14.1 (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
+#    # v2.14.1: Reverted MADCTL to 0x40 (MX=1, BGR) + no flip in image_to_data().
+#           This is the v2.10.0 combination confirmed working on hardware.
+#           All subsequent orientation attempts (0xC0, 0x00 + flip) were wrong.
 #    # v2.14.0: Code cleanup: removed unused imports (numpy, certifi, ssl, urlreq,
 #           socket), merged duplicate config reader (load_config → _cfg),
 #           removed unused get_text_size(), cleaned up st7735_tbm.py
@@ -963,7 +966,7 @@ def draw_screen7():
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
-print('Running Umbrel LCD script - Version: 2.14.0 (Umbrel 1.x compatible)')
+print('Running Umbrel LCD script - Version: 2.14.1 (Umbrel 1.x compatible)')
 
 # Display umbrel logo on startup (duration configurable in config.ini)
 display_background_image('umbrel_logo.png')
