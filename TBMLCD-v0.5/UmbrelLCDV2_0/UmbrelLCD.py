@@ -411,7 +411,7 @@ def display_background_image(image_name):
     image_path = images_path + image_name
     picimage = Image.open(image_path).convert('RGBA')
     picimage = picimage.resize((160, 128), Image.BICUBIC)
-    rotated = picimage.rotate(90, expand=1)          # → 128×160
+    rotated = picimage.rotate(270, expand=1)          # → 128×160
     screen_buffer = Image.new('RGB', (WIDTH, HEIGHT))
     screen_buffer.paste(rotated, (0, 0), rotated)
     draw = ImageDraw.Draw(screen_buffer)
@@ -420,7 +420,7 @@ def display_background_image(image_name):
 def display_icon(image, image_path, position, icon_size):
     picimage = Image.open(image_path).convert('RGBA')
     picimage = picimage.resize((icon_size, icon_size), Image.BICUBIC)
-    rotated = picimage.rotate(90, expand=1)
+    rotated = picimage.rotate(270, expand=1)
     image.paste(rotated, position, rotated)
 
 
@@ -806,11 +806,17 @@ def display_temperature():
 def display_block_count_text():
     try:
         display_background_image('Block_HeightBG.png')
-        block_x_pos = 72
+        # Block_HeightBG layout (128x160 after rotate 270):
+        #   Block icon (hexagon): x=65~120, y=53~107 (right side)
+        #   Left area x=0~60 is empty → place block number here
+        # Use font size 30 to fit 6-digit block number in x=0~60
         btc_current_block = get_block_count()
-        font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 40)
-        draw_centered_text(screen_buffer, btc_current_block,
-                           get_inverted_x(block_x_pos, 40), 90, font)
+        n = len(str(btc_current_block))
+        # 6 digits: font 28, 7 digits: font 24
+        fs = 30 if n <= 6 else (26 if n == 7 else 22)
+        font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", fs)
+        # Place in left half (x=15~58), centered vertically on y-axis
+        draw_centered_text(screen_buffer, btc_current_block, 15, 90, font)
     except Exception as e:
         print("Error creating block count text;", str(e))
 
@@ -829,24 +835,39 @@ def draw_screen2():
     high = int(fees_dict['fastestFee'])
     low = int(fees_dict['hourFee'])
 
+    # TxsBG layout (128x160 after rotate 270):
+    #   Right column boxes: x=80~127
+    #     Top box:    y=2~75  → fee numbers go here
+    #     Bottom box: y=80~158 → fee numbers go here
+    #   Left area: x=0~70
+    #     TXS label: x=46~62, y=14~48
+    #     Icons:     x=9~16,  y=6~57
+    #     Unconfirmed txs: x=7 (left edge), y=0~79
+    #     Next block txs:  x=43, y=67
+
     def fee_font_size(n):
-        return int(86 / n) if n > 2 else 43
+        # Max width inside box ~45px, height ~73px
+        if n == 1: return 60
+        if n == 2: return 43
+        return int(86 / n)
 
     low_fs = fee_font_size(len(str(low)))
     high_fs = fee_font_size(len(str(high)))
-    low_x = 90 if len(str(low)) == 3 else 85
-    high_x = 90 if len(str(high)) == 3 else 85
 
-    draw_left_justified_text(screen_buffer, str(low), low_x, 9, 90,
+    # Top box: x=82, y=2~75 → center vertically in box
+    draw_left_justified_text(screen_buffer, str(low), 82, 5, 90,
                              ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", low_fs))
-    draw_left_justified_text(screen_buffer, str(high), high_x, 88, 90,
+    # Bottom box: x=82, y=82~158
+    draw_left_justified_text(screen_buffer, str(high), 82, 83, 90,
                              ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", high_fs))
 
+    # Next block txs count: left area, below TXS label
     txs = int(next_block_dict['nTx'])
     txs_fs = int(112 / len(str(txs))) if len(str(txs)) > 4 else 28
     draw_left_justified_text(screen_buffer, str(txs), 43, 67, 90,
                              ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", txs_fs))
 
+    # Unconfirmed txs: far left
     u_n = len(unconfirmed_txs)
     u_fs = int(120 / u_n) if u_n > 5 else 24
     draw_left_justified_text(screen_buffer, unconfirmed_txs, 7, 64, 90,
@@ -874,40 +895,47 @@ def draw_screen4():
 def draw_screen5():
     display_background_image('network.png')
 
+    # network.png layout (128x160 after rotate 270):
+    #   "Network" label:      x=108~119, y=8~79 (top-right)
+    #   "Connections" label:  x=87~93,   y=9~138 (top+bottom right-mid)
+    #   "Hashrate" label:     x=40~46,   y=8~147 (top+bottom left-mid)
+    #   "Blockchain" label:   x=40~46,   y=89~147 (bottom left-mid)
+    #   "Mempool" label:      x=87~93,   y=89~138 (bottom right-mid)
+    #
+    #   Numbers go in the EMPTY space to the LEFT of each label:
+    #   Connections (top):    x=60~85, y=center around 40
+    #   Mempool (bottom):     x=60~85, y=center around 120
+    #   Hashrate (top):       x=20~38, y=center around 40
+    #   Blockchain (bottom):  x=20~38, y=center around 120
+    #   Unit labels go further left of the numbers
+
+    # Font definitions
+    val_font_lg = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 18)
+    val_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 14)
+    unit_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 9)
+
+    # Connections (top-right area): x=60, y=25 (upper half center)
     conn = get_connection_count()
     conn_str = str(conn)
-    n = len(conn_str)
-    conn_y = 23 if n == 2 else (27 if n == 1 else 19)
-    conn_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 15)
-    draw_left_justified_text(screen_buffer, conn_str, 68, conn_y, 90, conn_font)
+    draw_left_justified_text(screen_buffer, conn_str, 60, 25, 90, val_font_lg)
 
+    # Mempool (bottom-right area): x=60, y=100 (lower half center)
     mem = get_mempool_info()
     mem_val, mem_unit = mem.split()[0], mem.split()[1]
-    n = len(mem_val)
-    mem_y = 101 if n == 2 else (108 if n == 1 else 98)
-    mem_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 15)
-    draw_left_justified_text(screen_buffer, mem_val, 68, mem_y, 90, mem_font)
-    unit_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 9)
-    draw_left_justified_text(screen_buffer, mem_unit, 55, 105, 90, unit_font)
-    draw_left_justified_text(screen_buffer, "Peers", 55, 22, 90, unit_font)
+    draw_left_justified_text(screen_buffer, mem_val, 60, 100, 90, val_font)
+    draw_left_justified_text(screen_buffer, mem_unit, 48, 105, 90, unit_font)
 
+    # Hashrate (top-left area): x=20, y=25 (upper half center)
     hr = get_network_hash_ps()
     hr_val, hr_unit = hr.split()[0], hr.split()[1]
-    n = len(hr_val)
-    hr_y = 23 if n == 2 else (27 if n == 1 else 19)
-    hr_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 15)
-    draw_left_justified_text(screen_buffer, hr_val, 22, hr_y, 90, hr_font)
-    hr_unit_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 9)
-    draw_left_justified_text(screen_buffer, hr_unit, 8, 22, 90, hr_unit_font)
+    draw_left_justified_text(screen_buffer, hr_val, 20, 25, 90, val_font)
+    draw_left_justified_text(screen_buffer, hr_unit, 8, 20, 90, unit_font)
 
+    # Blockchain size (bottom-left area): x=20, y=100 (lower half center)
     bs = get_blockchain_size()
     bs_val, bs_unit = bs.split()[0], bs.split()[1]
-    n = len(bs_val)
-    bs_y = 101 if n == 2 else (108 if n == 1 else 98)
-    bs_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 15)
-    draw_left_justified_text(screen_buffer, bs_val, 22, bs_y, 90, bs_font)
-    bs_unit_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 9)
-    draw_left_justified_text(screen_buffer, bs_unit, 8, 105, 90, bs_unit_font)
+    draw_left_justified_text(screen_buffer, bs_val, 20, 100, 90, val_font)
+    draw_left_justified_text(screen_buffer, bs_unit, 8, 105, 90, unit_font)
 
 
 def draw_screen6():
@@ -917,19 +945,29 @@ def draw_screen6():
         return
     connections, active_channels = result
 
-    n = len(str(connections))
-    conn_y = 23 if n == 2 else (27 if n == 1 else 19)
-    conn_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 15)
-    draw_left_justified_text(screen_buffer, str(connections), 68, conn_y, 90, conn_font)
+    # payment_channels.png layout (128x160 after rotate 270):
+    #   "Payment Channels" label: x=111~121, y=6~151 (rightmost)
+    #   "Connections" label:      x=89~96,   y=7~135 (top, right-mid)
+    #   "Active" label:           x=89~96,   y=101~135 (bottom, right-mid)
+    #   "Max Send" label:         x=41~47,   y=7~154 (top, left-mid)
+    #   "Max Receive" label:      x=41~47,   y=82~154 (bottom, left-mid)
+    #
+    #   Numbers go LEFT of each label:
+    #   Connections (top):    x=60~87, y=center around 40
+    #   Active (bottom):      x=60~87, y=center around 120
+    #   Max Send (top):       x=20~39, y=center around 40
+    #   Max Receive (bottom): x=20~39, y=center around 120
 
-    n = len(str(active_channels))
-    ch_y = 101 if n == 2 else (108 if n == 1 else 98)
-    ch_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 15)
-    draw_left_justified_text(screen_buffer, str(active_channels), 68, ch_y, 90, ch_font)
+    # Font definitions
+    val_font_lg = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 18)
+    val_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 14)
+    btc_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 9)
 
-    label_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 9)
-    draw_left_justified_text(screen_buffer, "Channels", 55, 98, 90, label_font)
-    draw_left_justified_text(screen_buffer, "Peers", 55, 22, 90, label_font)
+    # Connections (top-right area): x=60, y=25 (upper half)
+    draw_left_justified_text(screen_buffer, str(connections), 60, 25, 90, val_font_lg)
+
+    # Active channels (bottom-right area): x=60, y=100 (lower half)
+    draw_left_justified_text(screen_buffer, str(active_channels), 60, 100, 90, val_font_lg)
 
     bal = get_lnd_channel_balance()
     if not bal:
@@ -938,21 +976,13 @@ def draw_screen6():
     send_val, send_unit = max_send.split()[0], max_send.split()[1]
     recv_val, recv_unit = max_receive.split()[0], max_receive.split()[1]
 
-    n = len(send_val)
-    send_y_map = {1: 27, 2: 23, 3: 19, 4: 15, 5: 10}
-    send_y = send_y_map.get(n, 6)
-    send_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 15)
-    draw_left_justified_text(screen_buffer, send_val, 22, send_y, 90, send_font)
+    # Max Send (top-left area): x=20, y=25 (upper half)
+    draw_left_justified_text(screen_buffer, send_val, 20, 25, 90, val_font)
+    draw_left_justified_text(screen_buffer, send_unit, 8, 20, 90, btc_font)
 
-    n = len(recv_val)
-    recv_y_map = {1: 108, 2: 101, 3: 98, 4: 93, 5: 90}
-    recv_y = recv_y_map.get(n, 90)
-    recv_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 15)
-    draw_left_justified_text(screen_buffer, recv_val, 22, recv_y, 90, recv_font)
-
-    btc_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 10)
-    draw_left_justified_text(screen_buffer, recv_unit, 8, 100, 90, btc_font)
-    draw_left_justified_text(screen_buffer, send_unit, 8, 22, 90, btc_font)
+    # Max Receive (bottom-left area): x=20, y=100 (lower half)
+    draw_left_justified_text(screen_buffer, recv_val, 20, 100, 90, val_font)
+    draw_left_justified_text(screen_buffer, recv_unit, 8, 105, 90, btc_font)
 
 
 def draw_screen7():
@@ -964,25 +994,38 @@ def draw_screen7():
     used_space, disk_capacity, available_space, used_pct = (
         storage_info[1], storage_info[0], storage_info[2], storage_info[3])
 
-    draw_left_justified_text(screen_buffer, used_space, 59, 7, 90,
-                             ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 20))
-    draw_left_justified_text(screen_buffer, "Used out of " + disk_capacity, 44, 7, 90,
-                             ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 11))
-    draw_right_justified_text(screen_buffer, available_space + " available", 13, 11, 90,
-                              ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 11))
+    # storage.png layout (128x160 after rotate 270):
+    #   "Storage" label:  x=105~120, y=6~149 (rightmost)
+    #   Storage icon:     x=85~105,  y=109~149 (bottom-right)
+    #   Left area x=0~100 is available for text
+    #
+    #   Layout plan (x = row position from top, y = horizontal position):
+    #   Row 1 (x=70~90):  Used space large text (e.g. "450 GB")
+    #   Row 2 (x=52~68):  "Used out of 2TB" small text
+    #   Row 3 (x=35~50):  "1.5TB available" small text
+    #   Progress bar (x=28~32): vertical bar spanning y=7~153
 
-    # Progress bar drawn directly on screen_buffer
+    draw_left_justified_text(screen_buffer, used_space, 70, 7, 90,
+                             ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 20))
+    draw_left_justified_text(screen_buffer, "Used out of " + disk_capacity, 52, 7, 90,
+                             ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 11))
+    draw_left_justified_text(screen_buffer, available_space + " available", 35, 7, 90,
+                             ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 11))
+
+    # Vertical progress bar: x=28~30, y=7~153
     draw_sb = ImageDraw.Draw(screen_buffer)
-    x, y, w, h = 29, 7, 2, 140
-    inner_h = int((used_pct * h) / 100) + y
-    draw_sb.rectangle((x, y, x + w, y + h), outline=(255, 255, 255), fill=(255, 255, 255))
-    draw_sb.rectangle((x, y, x + w, inner_h), outline=(0, 160, 0), fill=(0, 160, 0))
+    bar_x, bar_y, bar_w, bar_h = 28, 7, 2, 146
+    inner_h = int((used_pct * bar_h) / 100) + bar_y
+    draw_sb.rectangle((bar_x, bar_y, bar_x + bar_w, bar_y + bar_h),
+                      outline=(255, 255, 255), fill=(255, 255, 255))
+    draw_sb.rectangle((bar_x, bar_y, bar_x + bar_w, inner_h),
+                      outline=(0, 160, 0), fill=(0, 160, 0))
 
 
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
-print('Running Umbrel LCD script - Version: 2.14.6 (Umbrel 1.x compatible)')
+print('Running Umbrel LCD script - Version: 2.14.7 (Umbrel 1.x compatible)')
 
 # Display umbrel logo on startup (duration configurable in config.ini)
 display_background_image('umbrel_logo.png')
