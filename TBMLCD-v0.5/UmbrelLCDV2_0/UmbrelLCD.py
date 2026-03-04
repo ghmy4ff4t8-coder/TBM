@@ -1,17 +1,28 @@
-#!/usr/bin/env python3
+
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.1.0  (Umbrel 1.x compatible fork)
+#   Version  : 2.2.0  (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
-#     - Fixed Pillow 10+ compatibility: replaced deprecated draw.textsize()
-#       with draw.textbbox() — this was the root cause of the white screen
-#     - Fixed pip install for Python 3.11+ externally-managed-environment
-#     - Added fallback for bitcoin RPC (direct HTTP RPC + docker exec)
-#     - Added fallback for lncli (docker exec with multiple container names)
-#     - Fixed SPI config path for umbrelOS (/boot/firmware/config.txt)
-#     - Improved error handling and graceful degradation
-#     - Added disk detection for both /dev/sda1 and /dev/mmcblk0p1
+#     v2.2.0 (2024-03):
+#       - FIXED: ST7735.__init__() TypeError - pimoroni/st7735-python v1.0.0
+#         changed API completely:
+#           * 'rgb' parameter renamed to 'bgr'
+#           * GPIO pin numbers must now be strings ("GPIO24", not 24)
+#           * Adafruit_GPIO dependency removed; uses gpiod/spidev internally
+#           * 'import ST7735' deprecated; use 'import st7735' (lowercase)
+#           * disp.buffer removed; draw to a PIL Image, pass to disp.display()
+#       - FIXED: lcdSetupScript.sh now installs pimoroni/st7735-python
+#         (pip install st7735) instead of the old doido-technologies fork
+#     v2.1.0 (2024-02):
+#       - Fixed Pillow 10+ compatibility: replaced deprecated draw.textsize()
+#         with draw.textbbox() - this was the root cause of the white screen
+#       - Fixed pip install for Python 3.11+ externally-managed-environment
+#       - Added fallback for bitcoin RPC (direct HTTP RPC + docker exec)
+#       - Added fallback for lncli (docker exec with multiple container names)
+#       - Fixed SPI config path for umbrelOS (/boot/firmware/config.txt)
+#       - Improved error handling and graceful degradation
+#       - Added disk detection for both /dev/sda1 and /dev/mmcblk0p1
 #-------------------------------------------------------------------------------
 # This script displays eight screens on your Umbrel Node:
 #    1. First screen displays the umbrel logo.
@@ -35,9 +46,8 @@ from PIL import ImageFont
 import time
 import datetime
 
-import ST7735 as TFT
-import Adafruit_GPIO as GPIO
-import Adafruit_GPIO.SPI as SPI
+# pimoroni/st7735-python v1.0.0 uses lowercase module name
+import st7735 as TFT
 
 import urllib.request as urlreq
 import certifi
@@ -59,12 +69,19 @@ SPEED_HZ = 4000000
 
 
 # Raspberry Pi configuration.
-DC = 24
-RST = 25
-SPI_PORT = 0
-SPI_DEVICE = 0
+# pimoroni/st7735-python v1.0.0 requires GPIO pin numbers as strings.
+# Use "GPIO24" format (BCM numbering) or "PIN18" format (physical pin numbering).
+DC  = "GPIO24"   # physical Pin 18
+RST = "GPIO25"   # physical Pin 22
+SPI_PORT   = 0
+SPI_DEVICE = 0   # CE0 = cs=0
 
 # Create TFT LCD display class.
+# pimoroni/st7735-python v1.0.0 API changes:
+#   - 'rgb' parameter is now 'bgr' (True = BGR colour order, which is the default for most ST7735 panels)
+#   - 'dc' and 'rst' now accept strings like "GPIO24", not integers
+#   - 'cs' is the SPI chip-select number (0 or 1), not a GPIO pin
+#   - 'disp.buffer' no longer exists; create your own PIL Image and pass to disp.display(image)
 disp = TFT.ST7735(
     port=SPI_PORT,
     cs=SPI_DEVICE,
@@ -72,18 +89,19 @@ disp = TFT.ST7735(
     rst=RST,
     rotation=0,
     spi_speed_hz=SPEED_HZ,
-    rgb=False,
+    bgr=True,
     invert=False
 )
 
-# The display buffer
-disp.buffer = Image.new('RGB', (WIDTH, HEIGHT))
-
-# Shape drawing object
-draw = ImageDraw.Draw(disp.buffer)
-
 # Initialize display.
 disp.begin()
+
+# Create a persistent off-screen image buffer.
+# All drawing is done to this buffer; call disp.display(screen_buffer) to push to LCD.
+screen_buffer = Image.new('RGB', (WIDTH, HEIGHT))
+
+# Shape drawing object for the persistent buffer (used only for the progress bar in screen7)
+draw = ImageDraw.Draw(screen_buffer)
 
 # Get directory of the executing script
 filePath=str(pathlib.Path(__file__).parent.absolute())
@@ -96,11 +114,9 @@ poppins_fonts_path = filePath+'/poppins/'
 
 # Currency as a global variable
 currency = sys.argv[1]
-#currency = "USD"
 
 # User screen options
 userScreenChoices = sys.argv[2]
-#userScreenChoices = "Screen1,Screen2,Screen3,Screen4,Screen5,Screen6,Screen7"
 
 # Initial mempool url
 mempool_url = "https://mempool.space"
@@ -249,10 +265,10 @@ def get_corrected_x_position(ideal_font_height,smaller_font_height,ideal_x_posit
         return ideal_x_position
 
 # Define a function to draw the lcd background image.
+# NOTE: draws onto the global screen_buffer
 def display_background_image(image_name):
-    # Load an image.
+    global screen_buffer, draw
     image_path = images_path+image_name
-    image = disp.buffer
     position = (0,0)
     picimage = Image.open(image_path)
     # Convert to RGBA
@@ -261,8 +277,11 @@ def display_background_image(image_name):
     picimage = picimage.resize((160, 128), Image.BICUBIC)
     # Rotate image
     rotated = picimage.rotate(270, expand=1)
-    # Paste the image into the screen buffer
-    image.paste(rotated, position, rotated)
+    # Create a fresh buffer and paste the background
+    screen_buffer = Image.new('RGB', (WIDTH, HEIGHT))
+    screen_buffer.paste(rotated, position, rotated)
+    # Recreate draw object bound to the new buffer
+    draw = ImageDraw.Draw(screen_buffer)
 
 # Define a function to draw an icon.
 def display_icon(image, image_path, position,icon_size):
@@ -281,8 +300,8 @@ def display_icon(image, image_path, position,icon_size):
 # Define a function to create left justified text.
 def draw_left_justified_text(image, text, xposition, yPosition, angle, font, fill=(255,255,255)):
     # Get rendered font width and height.
-    draw = ImageDraw.Draw(image)
-    width, height = get_text_size(draw, text, font=font)
+    tmp_draw = ImageDraw.Draw(image)
+    width, height = get_text_size(tmp_draw, text, font=font)
     # Create a new image with transparent background to store the text.
     textimage = Image.new('RGBA', (width, height), (0,0,0,0))
     # Render the text.
@@ -299,8 +318,8 @@ def draw_left_justified_text(image, text, xposition, yPosition, angle, font, fil
 # Define a function to create right justified text.
 def draw_right_justified_text(image, text, xposition, yPosition, angle, font, fill=(255,255,255)):
     # Get rendered font width and height.
-    draw = ImageDraw.Draw(image)
-    width, height = get_text_size(draw, text, font=font)
+    tmp_draw = ImageDraw.Draw(image)
+    width, height = get_text_size(tmp_draw, text, font=font)
     # Create a new image with transparent background to store the text.
     textimage = Image.new('RGBA', (width, height), (0,0,0,0))
     # Render the text.
@@ -317,8 +336,8 @@ def draw_right_justified_text(image, text, xposition, yPosition, angle, font, fi
 # Define a function to create centered text.
 def draw_centered_text(image, text, xposition, angle, font, fill=(255,255,255)):
     # Get rendered font width and height.
-    draw = ImageDraw.Draw(image)
-    width, height = get_text_size(draw, text, font=font)
+    tmp_draw = ImageDraw.Draw(image)
+    width, height = get_text_size(tmp_draw, text, font=font)
     # Create a new image with transparent background to store the text.
     textimage = Image.new('RGBA', (width, height), (0,0,0,0))
     # Render the text.
@@ -424,9 +443,9 @@ def display_price_text(currency):
         # Display background
         display_background_image('Screen1@288x.png')
         # Display bitcoin icon
-        display_icon(disp.buffer, images_path+'bitcoin_seeklogo.png', (80,2),27)
+        display_icon(screen_buffer, images_path+'bitcoin_seeklogo.png', (80,2),27)
         # Display satoshi icon
-        display_icon(disp.buffer, images_path+'Satoshi_regular_elipse.png', (27,2),27)
+        display_icon(screen_buffer, images_path+'Satoshi_regular_elipse.png', (27,2),27)
         # Get the price
         price = get_btc_price(currency)
         newPrice = str(price)
@@ -444,18 +463,18 @@ def display_price_text(currency):
         ideal_x_position = 79
         font_x_position =  get_corrected_x_position(ideal_font_height,smaller_font_height,ideal_x_position)
         price_font = ImageFont.truetype(poppins_fonts_path+"Poppins-Bold.ttf", font_size)
-        draw_left_justified_text(disp.buffer, newPrice, font_x_position,30, 270, price_font, fill=(255,255,255))
+        draw_left_justified_text(screen_buffer, newPrice, font_x_position,30, 270, price_font, fill=(255,255,255))
 
         # Display currency
         currency_font_size = 12
         currency_font = ImageFont.truetype(poppins_fonts_path+"Poppins-Bold.ttf", currency_font_size)
-        draw_right_justified_text(disp.buffer, currency, get_inverted_x(1,currency_font_size),4, 270, currency_font, fill=(255,255,255))
+        draw_right_justified_text(screen_buffer, currency, get_inverted_x(1,currency_font_size),4, 270, currency_font, fill=(255,255,255))
 
         # display SAT / USD string
         sat_font_size = 14
         sats_msg = "SATS / "+currency
         sat_font = ImageFont.truetype(poppins_fonts_path+"Poppins-Bold.ttf", sat_font_size)
-        draw_left_justified_text(disp.buffer, sats_msg, get_inverted_x(111,sat_font_size),39, 270, sat_font, fill=(255,255,255))
+        draw_left_justified_text(screen_buffer, sats_msg, get_inverted_x(111,sat_font_size),39, 270, sat_font, fill=(255,255,255))
 
         # Calculate and display SAT/USD value
         if price != 0:
@@ -475,7 +494,7 @@ def display_price_text(currency):
         smaller_font_height = sat_font_size
         ideal_x_position = 24
         font_x_position =  get_corrected_x_position(ideal_font_height,smaller_font_height,ideal_x_position)
-        draw_left_justified_text(disp.buffer, sat_per_usd_str, font_x_position,30, 270, sat_font, fill=(255,255,255))
+        draw_left_justified_text(screen_buffer, sat_per_usd_str, font_x_position,30, 270, sat_font, fill=(255,255,255))
     except Exception as e:
         print("Error while creating price text; ",str(e))
 
@@ -499,7 +518,7 @@ def display_temperature():
 
     # display temperature
     temp_font = ImageFont.truetype(poppins_fonts_path+"Poppins-Bold.ttf", 12)
-    draw_right_justified_text(disp.buffer, temperature, 3,3, 270, temp_font, fill=(255,255,255))
+    draw_right_justified_text(screen_buffer, temperature, 3,3, 270, temp_font, fill=(255,255,255))
 
 
 # Define a function to auto fit block count text
@@ -513,7 +532,7 @@ def display_block_count_text():
         # Display the current block text
         hard_font_size = 40
         block_num_font = ImageFont.truetype(poppins_fonts_path+"Poppins-Bold.ttf", hard_font_size)
-        draw_centered_text(disp.buffer, btc_current_block, get_inverted_x(block_x_pos,hard_font_size), 270, block_num_font, fill=(255,255,255))
+        draw_centered_text(screen_buffer, btc_current_block, get_inverted_x(block_x_pos,hard_font_size), 270, block_num_font, fill=(255,255,255))
     except Exception as e:
         print("Error while creating block count text; ",str(e))
 
@@ -930,8 +949,8 @@ def draw_screen2():
     # Display the low and high fees
     low_fees_font = ImageFont.truetype(poppins_fonts_path+"Poppins-Bold.ttf", low_font_size)
     high_fees_font = ImageFont.truetype(poppins_fonts_path+"Poppins-Bold.ttf", high_font_size)
-    draw_left_justified_text(disp.buffer, str(low), low_fee_x,9, 270, low_fees_font, fill=(255,255,255))
-    draw_left_justified_text(disp.buffer, str(high), high_fee_x,88, 270, high_fees_font, fill=(255,255,255))
+    draw_left_justified_text(screen_buffer, str(low), low_fee_x,9, 270, low_fees_font, fill=(255,255,255))
+    draw_left_justified_text(screen_buffer, str(high), high_fee_x,88, 270, high_fees_font, fill=(255,255,255))
 
     # Get the number of transactions
     transactions = int(next_block_dict['nTx'])
@@ -945,7 +964,7 @@ def draw_screen2():
     # Display the transactions
     txs_x = 43
     txs_font = ImageFont.truetype(poppins_fonts_path+"Poppins-Bold.ttf", txs_font_size)
-    draw_left_justified_text(disp.buffer, str(transactions), txs_x,67, 270, txs_font, fill=(255,255,255))
+    draw_left_justified_text(screen_buffer, str(transactions), txs_x,67, 270, txs_font, fill=(255,255,255))
 
     # Get the number of unconfirmed transactions
     unconfirmed_txs_number_of_chars = len(unconfirmed_txs)
@@ -959,7 +978,7 @@ def draw_screen2():
     # Display the number of unconfirmed transactions
     unconfirmed_txs_x = 7
     unconfirmed_txs_font = ImageFont.truetype(poppins_fonts_path+"Poppins-Bold.ttf", unconfirmed_txs_font_size)
-    draw_left_justified_text(disp.buffer, unconfirmed_txs, unconfirmed_txs_x,64, 270, unconfirmed_txs_font, fill=(255,255,255))
+    draw_left_justified_text(screen_buffer, unconfirmed_txs, unconfirmed_txs_x,64, 270, unconfirmed_txs_font, fill=(255,255,255))
 
 
 # Define a function to draw Screen3
@@ -985,17 +1004,17 @@ def draw_screen4():
     # Display the time
     time_font_size = 30
     time_font = ImageFont.truetype(poppins_fonts_path+"Poppins-Bold.ttf", time_font_size)
-    draw_centered_text(disp.buffer, time_string, get_inverted_x(16,time_font_size), 270, time_font, fill=(255,255,255))
+    draw_centered_text(screen_buffer, time_string, get_inverted_x(16,time_font_size), 270, time_font, fill=(255,255,255))
 
     # Display week day
     day_font_size = 26
     day_font = ImageFont.truetype(poppins_fonts_path+"Poppins-Bold.ttf", day_font_size)
-    draw_centered_text(disp.buffer, day_string, get_inverted_x(59,day_font_size), 270, day_font, fill=(255,255,255))
+    draw_centered_text(screen_buffer, day_string, get_inverted_x(59,day_font_size), 270, day_font, fill=(255,255,255))
 
     # Display the month
     month_font_size = 22
     month_font = ImageFont.truetype(poppins_fonts_path+"Poppins-Bold.ttf", month_font_size)
-    draw_centered_text(disp.buffer, month_string, get_inverted_x(91,month_font_size), 270, month_font, fill=(255,255,255))
+    draw_centered_text(screen_buffer, month_string, get_inverted_x(91,month_font_size), 270, month_font, fill=(255,255,255))
 
 
 def draw_screen5():
@@ -1019,7 +1038,7 @@ def draw_screen5():
 
     connection_count_font_size = 15
     connection_count_font = ImageFont.truetype(poppins_fonts_path+"Poppins-Bold.ttf", connection_count_font_size)
-    draw_left_justified_text(disp.buffer, str(connection_count), connection_count_x,connection_count_y, 270, connection_count_font, fill=(255,255,255))
+    draw_left_justified_text(screen_buffer, str(connection_count), connection_count_x,connection_count_y, 270, connection_count_font, fill=(255,255,255))
 
     # mempool bytes
     mempool_bytes_data = get_mempool_info()
@@ -1037,13 +1056,13 @@ def draw_screen5():
 
     mempool_bytes_font_size = 15
     mempool_bytes_font = ImageFont.truetype(poppins_fonts_path+"Poppins-Bold.ttf", mempool_bytes_font_size)
-    draw_left_justified_text(disp.buffer, str(mempool_bytes), mempool_bytes_x,mempool_bytes_y, 270, mempool_bytes_font, fill=(255,255,255))
+    draw_left_justified_text(screen_buffer, str(mempool_bytes), mempool_bytes_x,mempool_bytes_y, 270, mempool_bytes_font, fill=(255,255,255))
 
     # Display mempool bytes units
     mempool_units_font_size = 9
     mempool_units_font = ImageFont.truetype(poppins_fonts_path+"Poppins-Bold.ttf", mempool_units_font_size)
-    draw_left_justified_text(disp.buffer, mempool_bytes_units, 55,105, 270, mempool_units_font, fill=(255,255,255))
-    draw_left_justified_text(disp.buffer, "Peers", 55,22, 270, mempool_units_font, fill=(255,255,255))
+    draw_left_justified_text(screen_buffer, mempool_bytes_units, 55,105, 270, mempool_units_font, fill=(255,255,255))
+    draw_left_justified_text(screen_buffer, "Peers", 55,22, 270, mempool_units_font, fill=(255,255,255))
 
     # Hash rate
     network_hash_rate_data = get_network_hash_ps()
@@ -1061,12 +1080,12 @@ def draw_screen5():
 
     network_hash_rate_font_size = 15
     network_hash_rate_font = ImageFont.truetype(poppins_fonts_path+"Poppins-Bold.ttf", network_hash_rate_font_size)
-    draw_left_justified_text(disp.buffer, str(network_hash_rate), network_hash_rate_x,network_hash_rate_y, 270, network_hash_rate_font, fill=(255,255,255))
+    draw_left_justified_text(screen_buffer, str(network_hash_rate), network_hash_rate_x,network_hash_rate_y, 270, network_hash_rate_font, fill=(255,255,255))
 
     # Display network hash rate units
     network_hash_rate_units_font_size = 9
     network_hash_rate_units_font = ImageFont.truetype(poppins_fonts_path+"Poppins-Bold.ttf", network_hash_rate_units_font_size)
-    draw_left_justified_text(disp.buffer, network_hash_rate_units, 8,22, 270, network_hash_rate_units_font, fill=(255,255,255))
+    draw_left_justified_text(screen_buffer, network_hash_rate_units, 8,22, 270, network_hash_rate_units_font, fill=(255,255,255))
 
     # Blockchain size
     blockchain_size_data = get_blockchain_size()
@@ -1084,12 +1103,12 @@ def draw_screen5():
 
     blockchain_size_font_size = 15
     blockchain_size_font = ImageFont.truetype(poppins_fonts_path+"Poppins-Bold.ttf", blockchain_size_font_size)
-    draw_left_justified_text(disp.buffer, str(blockchain_size), blockchain_size_x,blockchain_size_y, 270, blockchain_size_font, fill=(255,255,255))
+    draw_left_justified_text(screen_buffer, str(blockchain_size), blockchain_size_x,blockchain_size_y, 270, blockchain_size_font, fill=(255,255,255))
 
     # Display blockchain size units
     blockchain_size_units_font_size = 9
     blockchain_size_units_font = ImageFont.truetype(poppins_fonts_path+"Poppins-Bold.ttf", blockchain_size_units_font_size)
-    draw_left_justified_text(disp.buffer, blockchain_size_units, 8,105, 270, blockchain_size_units_font, fill=(255,255,255))
+    draw_left_justified_text(screen_buffer, blockchain_size_units, 8,105, 270, blockchain_size_units_font, fill=(255,255,255))
 
 def draw_screen6():
     """Displays the payment channels information"""
@@ -1114,7 +1133,7 @@ def draw_screen6():
 
     connection_count_font_size = 15
     connection_count_font = ImageFont.truetype(poppins_fonts_path+"Poppins-Bold.ttf", connection_count_font_size)
-    draw_left_justified_text(disp.buffer, str(connection_count), connection_count_x,connection_count_y, 270, connection_count_font, fill=(255,255,255))
+    draw_left_justified_text(screen_buffer, str(connection_count), connection_count_x,connection_count_y, 270, connection_count_font, fill=(255,255,255))
 
     # Active channels
     active_channels_x = 68
@@ -1128,13 +1147,13 @@ def draw_screen6():
 
     active_channels_font_size = 15
     active_channels_font = ImageFont.truetype(poppins_fonts_path+"Poppins-Bold.ttf", active_channels_font_size)
-    draw_left_justified_text(disp.buffer, str(active_channels), active_channels_x,active_channels_y, 270, active_channels_font, fill=(255,255,255))
+    draw_left_justified_text(screen_buffer, str(active_channels), active_channels_x,active_channels_y, 270, active_channels_font, fill=(255,255,255))
 
     # Display Connections and active channels units
     connections_units_font_size = 9
     connections_units_font = ImageFont.truetype(poppins_fonts_path+"Poppins-Bold.ttf", connections_units_font_size)
-    draw_left_justified_text(disp.buffer, "Channels", 55,98, 270, connections_units_font, fill=(255,255,255))
-    draw_left_justified_text(disp.buffer, "Peers", 55,22, 270, connections_units_font, fill=(255,255,255))
+    draw_left_justified_text(screen_buffer, "Channels", 55,98, 270, connections_units_font, fill=(255,255,255))
+    draw_left_justified_text(screen_buffer, "Peers", 55,22, 270, connections_units_font, fill=(255,255,255))
 
     # lnd wallet max send and max receive
     temp_max_send,temp_max_receive = get_lnd_channel_balance()
@@ -1161,7 +1180,7 @@ def draw_screen6():
 
     max_send_font_size = 15
     max_send_font = ImageFont.truetype(poppins_fonts_path+"Poppins-Bold.ttf", max_send_font_size)
-    draw_left_justified_text(disp.buffer, str(max_send), max_send_x,max_send_y, 270, max_send_font, fill=(255,255,255))
+    draw_left_justified_text(screen_buffer, str(max_send), max_send_x,max_send_y, 270, max_send_font, fill=(255,255,255))
 
     # Max receive
     max_receive_x = 22
@@ -1181,13 +1200,13 @@ def draw_screen6():
 
     max_receive_font_size = 15
     max_receive_font = ImageFont.truetype(poppins_fonts_path+"Poppins-Bold.ttf", max_receive_font_size)
-    draw_left_justified_text(disp.buffer, str(max_receive), max_receive_x,max_receive_y, 270, max_receive_font, fill=(255,255,255))
+    draw_left_justified_text(screen_buffer, str(max_receive), max_receive_x,max_receive_y, 270, max_receive_font, fill=(255,255,255))
 
     # Display max send and max receive bitcoin units
     bitcoin_units_font_size = 10
     bitcoin_units_font = ImageFont.truetype(poppins_fonts_path+"Poppins-Bold.ttf", bitcoin_units_font_size)
-    draw_left_justified_text(disp.buffer, max_receive_units, 8,100, 270, bitcoin_units_font, fill=(255,255,255))
-    draw_left_justified_text(disp.buffer, max_send_units, 8,22, 270, bitcoin_units_font, fill=(255,255,255))
+    draw_left_justified_text(screen_buffer, max_receive_units, 8,100, 270, bitcoin_units_font, fill=(255,255,255))
+    draw_left_justified_text(screen_buffer, max_send_units, 8,22, 270, bitcoin_units_font, fill=(255,255,255))
 
 def draw_screen7():
     """Displays the disk storage information"""
@@ -1202,41 +1221,42 @@ def draw_screen7():
     used_space = storage_info[1]
     used_space_font_size = 20
     used_space_font = ImageFont.truetype(poppins_fonts_path+"Poppins-Bold.ttf", used_space_font_size)
-    draw_left_justified_text(disp.buffer, used_space, 59,7, 270, used_space_font, fill=(255,255,255))
+    draw_left_justified_text(screen_buffer, used_space, 59,7, 270, used_space_font, fill=(255,255,255))
 
     # Display space capacity
     disk_capacity = storage_info[0]
     disk_capacity_string = "Used out of "+ disk_capacity
     disk_capacity_font_size = 11
     disk_capacity_font = ImageFont.truetype(poppins_fonts_path+"Poppins-Bold.ttf", disk_capacity_font_size)
-    draw_left_justified_text(disp.buffer, disk_capacity_string, 44,7, 270, disk_capacity_font, fill=(255,255,255))
+    draw_left_justified_text(screen_buffer, disk_capacity_string, 44,7, 270, disk_capacity_font, fill=(255,255,255))
 
     # Display available space
     available_space = storage_info[2]
     available_space_string = available_space+" available"
     available_space_font_size = 11
     available_space_font = ImageFont.truetype(poppins_fonts_path+"Poppins-Bold.ttf", available_space_font_size)
-    draw_right_justified_text(disp.buffer, available_space_string, 13,11, 270, available_space_font, fill=(255,255,255))
+    draw_right_justified_text(screen_buffer, available_space_string, 13,11, 270, available_space_font, fill=(255,255,255))
 
-    # Progress bar
+    # Progress bar - draw directly onto screen_buffer
+    draw_sb = ImageDraw.Draw(screen_buffer)
     width = 2
     height = 140
     x = 29
     y = 7
     used_percentage = int(storage_info[3])
     inner_bar_height = int((used_percentage*height)/100)+y
-    draw.rectangle((x, y, width+x, height+y), outline=(255, 255, 255), fill=(255, 255, 255))
-    draw.rectangle((x, y, width+x, inner_bar_height), outline=(0, 160, 0), fill=(0, 160, 0))
+    draw_sb.rectangle((x, y, width+x, height+y), outline=(255, 255, 255), fill=(255, 255, 255))
+    draw_sb.rectangle((x, y, width+x, inner_bar_height), outline=(0, 160, 0), fill=(0, 160, 0))
 
 
 # ---------------------------------------------------------------------------
 # Start the display of images now.
 # ---------------------------------------------------------------------------
-print('Running Umbrel 1.8 Inch LCD script Version 2.1.0 (Umbrel 1.x compatible)')
+print('Running Umbrel 1.8 Inch LCD script Version 2.2.0 (Umbrel 1.x compatible)')
 
 # Display umbrel logo first for 60 seconds
 display_background_image('umbrel_logo.png')
-disp.display(disp.buffer)
+disp.display(screen_buffer)
 time.sleep(60)
 
 # An initial check if Tor is running
@@ -1259,7 +1279,7 @@ while True:
 
         if "Screen1" in userScreenChoices:
             draw_screen1(currency)
-            disp.display(disp.buffer)
+            disp.display(screen_buffer)
             time.sleep(60)
     except Exception as e:
             print("Error while showing screen1; ",str(e))
@@ -1268,7 +1288,7 @@ while True:
     try:
         if "Screen2" in userScreenChoices:
             draw_screen2()
-            disp.display(disp.buffer)
+            disp.display(screen_buffer)
             time.sleep(30)
     except Exception as e:
         print("Error while showing screen2; ",str(e))
@@ -1277,7 +1297,7 @@ while True:
     try:
         if "Screen3" in userScreenChoices:
             draw_screen3()
-            disp.display(disp.buffer)
+            disp.display(screen_buffer)
             time.sleep(30)
     except Exception as e:
         print("Error while showing screen3; ",str(e))
@@ -1286,7 +1306,7 @@ while True:
     try:
         if "Screen4" in userScreenChoices:
             draw_screen4()
-            disp.display(disp.buffer)
+            disp.display(screen_buffer)
             time.sleep(30)
     except Exception as e:
         print("Error while showing screen4; ",str(e))
@@ -1295,7 +1315,7 @@ while True:
     try:
         if "Screen5" in userScreenChoices:
             draw_screen5()
-            disp.display(disp.buffer)
+            disp.display(screen_buffer)
             time.sleep(30)
     except Exception as e:
         print("Error while showing screen5; ",str(e))
@@ -1304,7 +1324,7 @@ while True:
     try:
         if "Screen6" in userScreenChoices:
             draw_screen6()
-            disp.display(disp.buffer)
+            disp.display(screen_buffer)
             time.sleep(30)
     except Exception as e:
         print("Error while showing screen6; ",str(e))
@@ -1313,7 +1333,7 @@ while True:
     try:
         if "Screen7" in userScreenChoices:
             draw_screen7()
-            disp.display(disp.buffer)
+            disp.display(screen_buffer)
             time.sleep(30)
     except Exception as e:
         print("Error while showing screen7; ",str(e))
