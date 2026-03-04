@@ -1,29 +1,35 @@
 
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.4.0  (Umbrel 1.x compatible fork)
+#   Version  : 2.5.0  (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
-#     v2.4.0 (2024-03):
-#       - FIXED: Distorted/twisted display caused by rotation being applied twice.
+#     v2.5.0 (2024-03):
+#       - FIXED: Diagonal stripe / sline noise caused by SPI stride mismatch.
 #
 #         Root cause analysis:
-#         The original TBM code drew everything onto a 128x160 portrait buffer,
-#         then rotated each element 270° before pasting. The old ST7735 library
-#         (doido-technologies fork) sent the buffer to the LCD as-is (no internal
-#         rotation), so the 270° rotation in the drawing functions was the only
-#         rotation applied.
+#         pimoroni/st7735-python v1.0.0 image_to_data() does:
+#           pb = np.rot90(np.array(image.convert('RGB')), rotation // 90)
+#         The PIL image buffer is shape (HEIGHT, WIDTH, 3) = (160, 128, 3).
 #
-#         pimoroni/st7735-python v1.0.0 changed disp.display() to call
-#         image_to_data(image, self._rotation) which applies np.rot90() internally.
-#         With rotation=0 set in __init__, no internal rotation occurs - correct.
-#         BUT the drawing functions still rotate every element 270°, which means
-#         the final screen_buffer is already in the correct orientation for the
-#         physical LCD. We must pass it directly without any additional rotation.
+#         With rotation=0: np.rot90(arr, 0) → shape stays (160, 128, 3).
+#         The flattened byte stream is then written to the ST7735 starting at
+#         CASET x0=2..129 (128 cols) and RASET y0=1..160 (160 rows).
+#         But the numpy array has 160 'rows' of 128 pixels each — the library
+#         iterates row-major, so it sends 160 rows × 128 pixels. This matches
+#         the RASET window (160 rows) perfectly only if the LCD scans top-to-
+#         bottom in portrait. However the MADCTL byte 0xC0 sets MX=1, MY=1
+#         which means the ST7735 scans in landscape (row = physical column).
+#         Result: every row of pixel data is written across a physical column
+#         → diagonal stripe pattern.
 #
-#         The fix: set rotation=0 in ST7735.__init__ so image_to_data applies
-#         zero internal rotation, and keep the existing 270° drawing rotations
-#         exactly as in the original code. This matches the original behaviour.
+#         With rotation=90: np.rot90(arr, 1) → shape becomes (128, 160, 3).
+#         Now the byte stream has 128 'rows' of 160 pixels, matching the
+#         landscape MADCTL scan direction. The image appears correctly oriented.
+#
+#         The original TBM drawing code rotates every element 270° before
+#         pasting onto the 128×160 buffer. Adding the library's internal 90°
+#         rotation gives 270+90=360° = no net rotation. Correct portrait output.
 #
 #       - FIXED: bgr parameter - TBM uses a generic 128x160 ST7735 panel.
 #         These panels are typically RGB order. If colours appear wrong, set bgr=True.
@@ -118,12 +124,16 @@ SPI_DEVICE = 0   # CE0
 #     ST7735 internal memory is 132 cols × 162 rows.
 #     For a 128×160 panel: offset_left=(132-128)//2=2, offset_top=(162-160)//2=1
 #
-#   rotation=0
-#     The original TBM drawing functions rotate every element 270° before
-#     pasting onto the 128×160 buffer, producing a correctly-oriented image.
-#     pimoroni v1.0.0 applies np.rot90(image, rotation//90) inside display().
-#     Setting rotation=0 means NO additional rotation is applied by the library,
-#     so the 270° already baked into the buffer is the only rotation. Correct.
+#   rotation=90
+#     pimoroni v1.0.0 image_to_data() applies np.rot90(array, rotation//90).
+#     The PIL buffer is shape (160, 128, 3). With rotation=0 the shape stays
+#     (160, 128, 3) and the byte stream has 160 rows × 128 pixels — but the
+#     ST7735 MADCTL=0xC0 scans in landscape, so each 'row' maps to a physical
+#     column, producing diagonal stripes.
+#     With rotation=90: np.rot90 gives shape (128, 160, 3) — 128 rows × 160
+#     pixels — which matches the landscape scan direction perfectly.
+#     The original drawing code already rotates each element 270°, so the net
+#     rotation is 270° + 90° = 360° = correct portrait orientation.
 #
 #   bgr=False
 #     Generic ST7735 128×160 panels are usually RGB order.
@@ -139,7 +149,7 @@ disp = TFT.ST7735(
     rst=RST,
     width=128,
     height=160,
-    rotation=0,
+    rotation=90,
     offset_left=2,
     offset_top=1,
     spi_speed_hz=SPEED_HZ,
@@ -856,7 +866,7 @@ def draw_screen7():
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
-print('Running Umbrel LCD script Version 2.4.0 (Umbrel 1.x compatible)')
+print('Running Umbrel LCD script Version 2.5.0 (Umbrel 1.x compatible)')
 
 # Display umbrel logo for 60 seconds on startup
 display_background_image('umbrel_logo.png')
