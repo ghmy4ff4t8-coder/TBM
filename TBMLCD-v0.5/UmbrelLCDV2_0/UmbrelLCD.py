@@ -1,9 +1,17 @@
 
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.9.0  (Umbrel 1.x compatible fork)
+#   Version  : 2.10.0 (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
+#     v2.10.0 (2024-03):
+#       - FIXED: LCD left-right mirror - MADCTL 0x08 → 0x48 (added MX=1 bit)
+#         Photos showed text was horizontally mirrored (e.g. "USD" → "uen")
+#       - FIXED: Colour inversion - bgr=True added to ST7735 init
+#         Bitcoin icon was blue instead of orange (RGB/BGR byte order swap)
+#       - ADDED: Screen display durations configurable via config.ini [DISPLAY]
+#         logo_duration, screen1_duration, screen_duration (default: 60/60/30s)
+#
 #     v2.9.0 (2024-03):
 #       - FIXED: LCD 180-degree rotation - MADCTL changed from 0xC8 (MY=1,MX=1)
 #         to 0x08 (MY=0,MX=0). Photos confirmed image was upside-down+mirrored.
@@ -172,7 +180,8 @@ disp = ST7735(
     offset_left=0,
     offset_top=0,
     spi_speed_hz=SPEED_HZ,
-    invert=False
+    invert=False,
+    bgr=True    # TBM panel uses BGR colour order (blue icon = wrong, orange = correct)
 )
 
 
@@ -223,6 +232,17 @@ _cfg = configparser.ConfigParser()
 _cfg.read(os.path.join(basedir, 'config.ini'))
 
 BITCOIN_RPC_USER = _cfg.get('BITCOIN', 'rpc_user', fallback='umbrel')
+
+# ---------------------------------------------------------------------------
+# Screen display durations (seconds) - configurable via config.ini
+# [DISPLAY]
+# logo_duration   = 60   ; startup Umbrel logo screen
+# screen1_duration = 60  ; Bitcoin price screen
+# screen_duration  = 30  ; all other screens (2-7)
+# ---------------------------------------------------------------------------
+LOGO_DURATION    = int(_cfg.get('DISPLAY', 'logo_duration',    fallback='60'))
+SCREEN1_DURATION = int(_cfg.get('DISPLAY', 'screen1_duration', fallback='60'))
+SCREEN_DURATION  = int(_cfg.get('DISPLAY', 'screen_duration',  fallback='30'))
 BITCOIN_RPC_PASS = _cfg.get('BITCOIN', 'rpc_pass', fallback='moneyprintergobrrr')
 BITCOIN_RPC_HOST = _cfg.get('BITCOIN', 'rpc_host', fallback='127.0.0.1')
 BITCOIN_RPC_PORT = int(_cfg.get('BITCOIN', 'rpc_port', fallback='8332'))
@@ -941,12 +961,12 @@ def draw_screen7():
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
-print('Running Umbrel LCD script Version 2.9.0 (Umbrel 1.x compatible)')
+print('Running Umbrel LCD script Version 2.10.0 (Umbrel 1.x compatible)')
 
-# Display umbrel logo for 60 seconds on startup
+# Display umbrel logo on startup (duration configurable in config.ini)
 display_background_image('umbrel_logo.png')
 lcd_display(screen_buffer)
-time.sleep(60)
+time.sleep(LOGO_DURATION)
 
 tor_status = get_tor_status()
 mempool_status = check_umbrel_and_mempool()
@@ -961,7 +981,7 @@ while True:
         if "Screen1" in userScreenChoices:
             draw_screen1(currency)
             lcd_display(screen_buffer)
-            time.sleep(60)
+            time.sleep(SCREEN1_DURATION)
     except Exception as e:
         print("Error showing screen1;", str(e))
 
@@ -969,7 +989,7 @@ while True:
         if "Screen2" in userScreenChoices:
             draw_screen2()
             lcd_display(screen_buffer)
-            time.sleep(30)
+            time.sleep(SCREEN_DURATION)
     except Exception as e:
         print("Error showing screen2;", str(e))
 
@@ -977,7 +997,7 @@ while True:
         if "Screen3" in userScreenChoices:
             draw_screen3()
             lcd_display(screen_buffer)
-            time.sleep(30)
+            time.sleep(SCREEN_DURATION)
     except Exception as e:
         print("Error showing screen3;", str(e))
 
@@ -985,7 +1005,7 @@ while True:
         if "Screen4" in userScreenChoices:
             draw_screen4()
             lcd_display(screen_buffer)
-            time.sleep(30)
+            time.sleep(SCREEN_DURATION)
     except Exception as e:
         print("Error showing screen4;", str(e))
 
@@ -993,7 +1013,7 @@ while True:
         if "Screen5" in userScreenChoices:
             draw_screen5()
             lcd_display(screen_buffer)
-            time.sleep(30)
+            time.sleep(SCREEN_DURATION)
     except Exception as e:
         print("Error showing screen5;", str(e))
 
@@ -1001,7 +1021,7 @@ while True:
         if "Screen6" in userScreenChoices:
             draw_screen6()
             lcd_display(screen_buffer)
-            time.sleep(30)
+            time.sleep(SCREEN_DURATION)
     except Exception as e:
         print("Error showing screen6;", str(e))
 
@@ -1009,6 +1029,6 @@ while True:
         if "Screen7" in userScreenChoices:
             draw_screen7()
             lcd_display(screen_buffer)
-            time.sleep(30)
+            time.sleep(SCREEN_DURATION)
     except Exception as e:
         print("Error showing screen7;", str(e))

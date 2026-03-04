@@ -89,7 +89,7 @@ class ST7735(object):
     def __init__(self, port, cs, dc, rst=None,
                  width=ST7735_TFTWIDTH, height=ST7735_TFTHEIGHT,
                  offset_left=None, offset_top=None,
-                 invert=False, spi_speed_hz=16000000):
+                 invert=False, bgr=False, spi_speed_hz=16000000):
         """Initialise the ST7735 display.
 
         :param port:         SPI port number (e.g. 0)
@@ -101,11 +101,13 @@ class ST7735(object):
         :param offset_left:  Column offset in ST7735 RAM
         :param offset_top:   Row offset in ST7735 RAM
         :param invert:       Invert display colours
+        :param bgr:          True if panel uses BGR colour order (fixes blue icons)
         :param spi_speed_hz: SPI clock speed in Hz
         """
         self._width  = width
         self._height = height
         self._invert = invert
+        self._bgr    = bgr
         self._dc_pin = dc
         self._rst_pin = rst
 
@@ -257,12 +259,16 @@ class ST7735(object):
         #   Bit 5 (MV)  = Row/Column exchange
         #   Bit 3 (RGB) = 0=RGB order, 1=BGR order
         #
-        # Original doido-technologies used 0xC8 (MY=1, MX=1, RGB=0).
-        # Photos show the image is 180 degrees rotated (upside-down + mirrored).
-        # MY=1, MX=1 means both axes are flipped → 180° rotation.
-        # Setting MY=0, MX=0 (0x08) corrects the orientation.
+        # TBM panel orientation determination (from user photos):
+        #   0xC8 (MY=1,MX=1,RGB): 180° rotated (both axes flipped)
+        #   0x08 (MY=0,MX=0,RGB): top-bottom correct, left-right still mirrored
+        #   0x48 (MY=0,MX=1,RGB): correct orientation
+        #   0x40 (MY=0,MX=1,BGR): correct orientation + BGR colour order
+        # MADCTL bit 3 = 0 means BGR, bit 3 = 1 means RGB (ST7735 spec)
+        # bgr=True → clear bit 3 → 0x40; bgr=False → set bit 3 → 0x48
+        madctl = 0x40 if self._bgr else 0x48
         self.command(ST7735_MADCTL)
-        self.data(0x08)
+        self.data(madctl)
 
         self.command(ST7735_COLMOD)     # 16-bit colour
         self.data(0x05)
