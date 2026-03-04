@@ -38,7 +38,7 @@ The following issues caused the blank white screen on Umbrel 1.x systems:
 
 ```bash
 cd ~
-git clone https://github.com/YOUR_USERNAME/TBM.git
+git clone https://github.com/ghmy4ff4t8-coder/TBM.git
 cd TBM/TBMLCD-v0.5/UmbrelLCDV2_0
 ```
 
