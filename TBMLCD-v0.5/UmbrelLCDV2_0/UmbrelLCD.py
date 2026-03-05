@@ -783,8 +783,10 @@ def display_price_text(currency):
         font_size = int(195 / n) if n else 12
 
         # BTC price in right half (x=64~79)
-        font_x = get_corrected_x_position(39, font_size, 64)
-        price_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", font_size)
+        # Ensure font size doesn't exceed safe zone
+        safe_font_size = min(font_size, 32)
+        font_x = get_corrected_x_position(39, safe_font_size, 64)
+        price_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", safe_font_size)
         draw_left_justified_text(screen_buffer, newPrice, font_x, 30, 90, price_font)
 
         # Currency label: right-justified in right half
@@ -800,8 +802,9 @@ def display_price_text(currency):
         sat_val = str(int(100_000_000 / price)) if price else "0"
         n2 = len(sat_val)
         sf = int(200 / n2) if n2 > 4 else 50
-        sat_font2 = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", sf)
-        fx2 = get_corrected_x_position(50, sf, 27)
+        safe_sf = min(sf, 40)
+        sat_font2 = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", safe_sf)
+        fx2 = get_corrected_x_position(50, safe_sf, 27)
         draw_left_justified_text(screen_buffer, sat_val, fx2, 30, 90, sat_font2)
     except Exception as e:
         print("Error creating price text;", str(e))
@@ -871,24 +874,23 @@ def draw_screen2():
         return int(86 / n)
 
     low_fs = fee_font_size(len(str(low)))
-    high_fs = fee_font_size(len(str(high)))
-
-    # Unconfirmed txs: top box (x=5, y=5~75)
+    high_fs = fee_font_s    # Unconfirmed TXs: bottom-left area (x=5, y=90)
+    unconfirmed_txs = str(get_unconfirmed_tx_count())
     u_n = len(unconfirmed_txs)
-    u_fs = int(120 / u_n) if u_n > 5 else 24
-    draw_left_justified_text(screen_buffer, unconfirmed_txs, 5, 5, 90,
+    u_fs = int(120 / u_n) if u_n > 5 else 16
+    draw_left_justified_text(screen_buffer, unconfirmed_txs, 5, 90, 90,
                              ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", u_fs))
 
-    # Next block txs count: bottom box (x=30, y=5~75)
-    txs = int(next_block_dict['nTx'])
-    txs_fs = int(112 / len(str(txs))) if len(str(txs)) > 4 else 28
-    draw_left_justified_text(screen_buffer, str(txs), 30, 5, 90,
+    # Daily TXs: top-left area (x=45, y=5)
+    txs = get_daily_tx_count()
+    txs_fs = int(112 / len(str(txs))) if len(str(txs)) > 4 else 22
+    draw_left_justified_text(screen_buffer, str(txs), 45, 5, 90,
                              ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", txs_fs))
 
-    # Fee numbers: right area (x=76, next to arrow icons)
-    draw_left_justified_text(screen_buffer, str(low), 76, 10, 90,
+    # Fee numbers: right area (x=80, centered in boxes)
+    draw_left_justified_text(screen_buffer, str(low), 80, 25, 90,
                              ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", low_fs))
-    draw_left_justified_text(screen_buffer, str(high), 76, 100, 90,
+    draw_left_justified_text(screen_buffer, str(high), 80, 105, 90,
                              ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", high_fs))
 
 
@@ -971,21 +973,21 @@ def draw_screen6():
     val_font_lg = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 18)
     btc_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 12)
 
-    # Connections (top): x=67, y=5 (upper half, row 1)
-    draw_left_justified_text(screen_buffer, str(connections), 67, 5, 90, val_font_lg)
+    # Connections (bottom half): x=67, y=90
+    draw_left_justified_text(screen_buffer, str(connections), 67, 90, 90, val_font_lg)
 
-    # Active channels (bottom): x=67, y=90 (lower half, row 1)
-    draw_left_justified_text(screen_buffer, str(active_channels), 67, 90, 90, val_font_lg)
+    # Active channels (top half): x=67, y=5
+    draw_left_justified_text(screen_buffer, str(active_channels), 67, 5, 90, val_font_lg)
 
     bal = get_lnd_channel_balance()
     if not bal:
         return
     max_send, max_receive = bal
 
-    # Max Receive (top): x=49, y=5 (upper half, row 2)
+    # Max Receive (top half): x=49, y=5
     draw_left_justified_text(screen_buffer, max_receive, 49, 5, 90, btc_font)
 
-    # Max Send (bottom): x=49, y=90 (lower half, row 2)
+    # Max Send (bottom half): x=49, y=90
     draw_left_justified_text(screen_buffer, max_send, 49, 90, 90, btc_font)
 
 
@@ -999,26 +1001,26 @@ def draw_screen7():
         storage_info[1], storage_info[0], storage_info[2], storage_info[3])
 
     # storage.png layout (128x160 after rotate 270):
-    #   Storage icon:     x=81~121 (right side)
-    #   "Storage" label:  x=24~46  (right-mid area)
-    #   Empty space:      x=47~80  (34px) → text goes here
+    #   Storage icon:     x=80~120, y=100~140
+    #   "Storage" label:  x=100~120, y=10~60
+    #   Safe space for text: x=5~60
     #
     #   Layout plan (x = row position from left, y = horizontal position):
-    #   Row 1 (x=47~70):  Used space large text (e.g. "929.1 GB")
-    #   Row 2 (x=72~84):  "Used out of 2TB" small text
-    #   Row 3 (x=86~98):  "1.5TB available" small text
-    #   Progress bar (x=100~116): horizontal bar spanning y=5~153
+    #   Row 1 (x=10~30):  Used space large text (e.g. "929.1 GB")
+    #   Row 2 (x=35~45):  "Used out of 2TB" small text
+    #   Row 3 (x=50~60):  "1.5TB available" small text
+    #   Progress bar (x=65~77): moved to avoid icon overlap
 
-    draw_left_justified_text(screen_buffer, used_space, 47, 5, 90,
+    draw_left_justified_text(screen_buffer, used_space, 10, 5, 90,
                              ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 22))
-    draw_left_justified_text(screen_buffer, "Used out of " + disk_capacity, 72, 5, 90,
+    draw_left_justified_text(screen_buffer, "Used out of " + disk_capacity, 35, 5, 90,
                              ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 11))
-    draw_left_justified_text(screen_buffer, available_space + " available", 86, 5, 90,
+    draw_left_justified_text(screen_buffer, available_space + " available", 50, 5, 90,
                              ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 11))
 
-    # Horizontal progress bar: x=100~116, y=5~153
+    # Horizontal progress bar: x=65~77, y=5~155 (Safe area left of icon)
     draw_sb = ImageDraw.Draw(screen_buffer)
-    bar_x, bar_y, bar_w, bar_h = 100, 5, 16, 150
+    bar_x, bar_y, bar_w, bar_h = 65, 5, 12, 150
     inner_h = int((used_pct * bar_h) / 100)
     draw_sb.rectangle((bar_x, bar_y, bar_x + bar_w, bar_y + bar_h),
                       outline=(255, 255, 255), width=1)
