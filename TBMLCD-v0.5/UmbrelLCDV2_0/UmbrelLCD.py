@@ -1,9 +1,14 @@
 
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.14.6 (Umbrel 1.x compatible fork)
+#   Version  : 2.15.0 (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
+#    # v2.15.0: Changed display_background_image() from rotate(90) to rotate(270).
+#           Background PNG files are designed for rotate(270) orientation.
+#           All screen text coordinates recalibrated for rotate(270) coordinate system.
+#           Screens updated: Bitcoin Price, Block Height, Transactions,
+#           Network, Payment Channels, Storage, Date/Time.
 #    # v2.14.6: Changed flip in image_to_data() from column flip ([:, ::-1, :])
 #           to row flip ([::-1, :, :]). After rotate(90 CCW), buffer rows =
 #           original columns, so row flip corrects the LR mirror correctly.
@@ -406,12 +411,15 @@ def get_corrected_x_position(ideal_font_height, smaller_font_height,
 
 
 def display_background_image(image_name):
-    """Load a background image, rotate 90°, paste into screen_buffer."""
+    """Load a background image, rotate 270°, paste into screen_buffer.
+    Background PNG files are designed for rotate(270) orientation.
+    Text is drawn with angle=90 which matches this coordinate system.
+    """
     global screen_buffer, draw
     image_path = images_path + image_name
     picimage = Image.open(image_path).convert('RGBA')
     picimage = picimage.resize((160, 128), Image.BICUBIC)
-    rotated = picimage.rotate(90, expand=1)           # → 128×160
+    rotated = picimage.rotate(270, expand=1)           # → 128×160
     screen_buffer = Image.new('RGB', (WIDTH, HEIGHT))
     screen_buffer.paste(rotated, (0, 0), rotated)
     draw = ImageDraw.Draw(screen_buffer)
@@ -757,6 +765,15 @@ def get_btc_network():
 def display_price_text(currency):
     try:
         display_background_image('Screen1@288x.png')
+        # Screen1@288x.png layout (128x160 after rotate 270):
+        #   Left half (x=0~63):  SAT price area
+        #     Satoshi icon: x=27~54
+        #     SAT value:    x=27~54 (below icon)
+        #     SATS/USD label: x=1~26
+        #   Right half (x=64~127): BTC price area
+        #     Bitcoin icon: x=80~107
+        #     Price value:  x=64~79 (below icon)
+        #     Currency label: right-justified
         display_icon(screen_buffer, images_path + 'bitcoin_seeklogo.png', (80, 2), 27)
         display_icon(screen_buffer, images_path + 'Satoshi_regular_elipse.png', (27, 2), 27)
 
@@ -765,23 +782,26 @@ def display_price_text(currency):
         n = len(newPrice)
         font_size = int(195 / n) if n else 12
 
-        ideal_x = 79
-        font_x = get_corrected_x_position(39, font_size, ideal_x)
+        # BTC price in right half (x=64~79)
+        font_x = get_corrected_x_position(39, font_size, 64)
         price_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", font_size)
         draw_left_justified_text(screen_buffer, newPrice, font_x, 30, 90, price_font)
 
+        # Currency label: right-justified in right half
         cur_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 12)
-        draw_right_justified_text(screen_buffer, currency, get_inverted_x(1, 12), 4, 90, cur_font)
+        draw_right_justified_text(screen_buffer, currency, 64, 4, 90, cur_font)
 
+        # SATS/USD label in left half (x=1~26)
         sat_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 14)
         draw_left_justified_text(screen_buffer, "SATS / " + currency,
-                                 get_inverted_x(111, 14), 39, 90, sat_font)
+                                 1, 39, 90, sat_font)
 
+        # SAT value in left half (x=27~54)
         sat_val = str(int(100_000_000 / price)) if price else "0"
         n2 = len(sat_val)
         sf = int(200 / n2) if n2 > 4 else 50
         sat_font2 = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", sf)
-        fx2 = get_corrected_x_position(50, sf, 24)
+        fx2 = get_corrected_x_position(50, sf, 27)
         draw_left_justified_text(screen_buffer, sat_val, fx2, 30, 90, sat_font2)
     except Exception as e:
         print("Error creating price text;", str(e))
@@ -806,18 +826,17 @@ def display_temperature():
 def display_block_count_text():
     try:
         display_background_image('Block_HeightBG.png')
-        # Block_HeightBG layout (128x160 after rotate 90):
-        #   Block icon (hexagon): x=5~66, y=52~106 (left area)
-        #   Right area x=67~127 is empty → place block number here
-        # Pixel analysis (rot90): icon bright pixels at x=5~66
-        # Numbers go in right area: x=67~127 (61px)
+        # Block_HeightBG layout (128x160 after rotate 270):
+        #   Block icon (hexagon): x=23~121 (occupies most of the screen)
+        #   Empty space: x=1~22 (left strip, 22px wide)
+        # Numbers go in left strip: x=1~22, centered vertically
         btc_current_block = get_block_count()
         n = len(str(btc_current_block))
-        # 6 digits: font 28, 7 digits: font 22
-        fs = 28 if n <= 6 else (22 if n == 7 else 18)
+        # 6 digits: font 18, 7 digits: font 14
+        fs = 18 if n <= 6 else (14 if n == 7 else 12)
         font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", fs)
-        # Place in right area (x=67), centered vertically on y-axis
-        draw_centered_text(screen_buffer, btc_current_block, 67, 90, font)
+        # Place in left strip (x=1), centered vertically on y-axis
+        draw_centered_text(screen_buffer, btc_current_block, 1, 90, font)
     except Exception as e:
         print("Error creating block count text;", str(e))
 
@@ -836,14 +855,14 @@ def draw_screen2():
     high = int(fees_dict['fastestFee'])
     low = int(fees_dict['hourFee'])
 
-    # TxsBG layout (128x160 after rotate 90):
-    #   Left column boxes: x=0~63
+    # TxsBG layout (128x160 after rotate 270):
+    #   Left boxes: x=3~63 (two boxes stacked)
     #     Top box:    y=2~75  → unconfirmed txs
     #     Bottom box: y=80~158 → next block txs
-    #   Right area: x=65~127
-    #     TXS label: x=65~80, y=14~48
-    #     Icons:     x=110~127, y=100~153
-    #     Fee numbers: x=72~100 (inside TXs area)
+    #   Right area: x=76~106 (arrow icons)
+    #   Empty right strip: x=107~125
+    #   Fee numbers go inside the boxes (x=5 top, x=30 bottom)
+    #   Fee sat/vB numbers go in right area: x=76
 
     def fee_font_size(n):
         # Max width inside box ~45px, height ~73px
@@ -866,10 +885,10 @@ def draw_screen2():
     draw_left_justified_text(screen_buffer, str(txs), 30, 5, 90,
                              ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", txs_fs))
 
-    # Fee numbers: right area (x=72, inside TXs label area)
-    draw_left_justified_text(screen_buffer, str(low), 72, 10, 90,
+    # Fee numbers: right area (x=76, next to arrow icons)
+    draw_left_justified_text(screen_buffer, str(low), 76, 10, 90,
                              ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", low_fs))
-    draw_left_justified_text(screen_buffer, str(high), 72, 100, 90,
+    draw_left_justified_text(screen_buffer, str(high), 76, 100, 90,
                              ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", high_fs))
 
 
@@ -894,38 +913,38 @@ def draw_screen4():
 def draw_screen5():
     display_background_image('network.png')
 
-    # network.png layout (128x160 after rotate 90):
-    #   "Network" label:      x=0~10,  y=8~79  (leftmost)
-    #   "Connections" label:  x=30~40, y=9~138 (left-mid, spans top+bottom)
-    #   "Mempool" label:      x=30~40, y=89~138 (left-mid, bottom)
-    #   "Blockchain" label:   x=60~70, y=8~147  (right-mid, top)
-    #   "Hashrate" label:     x=60~70, y=89~147 (right-mid, bottom)
+    # network.png layout (128x160 after rotate 270):
+    #   "Network" label:      x=108~119 (rightmost)
+    #   "Connections" label:  x=86~94,  y=80~159 (right-mid, bottom half)
+    #   "Mempool" label:      x=86~94,  y=0~79   (right-mid, top half)
+    #   "Blockchain" label:   x=24~47,  y=0~79   (left-mid, top half)
+    #   "Hashrate" label:     x=24~47,  y=80~159 (left-mid, bottom half)
     #
-    #   Numbers go in the EMPTY space to the RIGHT of each label:
-    #   Pixel analysis (rot90): all labels x=8~87, empty space x=88~127 (40px)
-    #   Row 1 (x=88~107, 19px): Connections (top) + Mempool (bottom)
-    #   Row 2 (x=108~127, 19px): Blockchain (top) + Hashrate (bottom)
+    #   Numbers go in the EMPTY space to the LEFT of each label:
+    #   Pixel analysis (rot270): labels x=24~47, x=86~94, x=108~119
+    #   Empty space: x=48~85 (38px)
+    #   Row 1 (x=65~85, 21px): Connections (top) + Mempool (bottom)
+    #   Row 2 (x=48~64, 17px): Blockchain (top) + Hashrate (bottom)
     #   y=0~79 (upper half), y=80~159 (lower half)
 
     val_font_lg = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 18)
-    val_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 14)
-    unit_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 9)
+    val_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 12)
 
-    # Connections (top): x=88, y=10 (upper half, row 1)
+    # Connections (top): x=65, y=5 (upper half, row 1)
     conn = get_connection_count()
-    draw_left_justified_text(screen_buffer, str(conn), 88, 10, 90, val_font_lg)
+    draw_left_justified_text(screen_buffer, str(conn), 65, 5, 90, val_font_lg)
 
-    # Mempool (bottom): x=88, y=90 (lower half, row 1)
+    # Mempool (bottom): x=65, y=90 (lower half, row 1)
     mem = get_mempool_info()  # e.g. "816 MB"
-    draw_left_justified_text(screen_buffer, mem, 88, 90, 90, val_font)
+    draw_left_justified_text(screen_buffer, mem, 65, 90, 90, val_font)
 
-    # Blockchain (top): x=108, y=10 (upper half, row 2)
+    # Blockchain (top): x=48, y=5 (upper half, row 2)
     bs = get_blockchain_size()  # e.g. "457 GB"
-    draw_left_justified_text(screen_buffer, bs, 108, 10, 90, val_font)
+    draw_left_justified_text(screen_buffer, bs, 48, 5, 90, val_font)
 
-    # Hashrate (bottom): x=108, y=90 (lower half, row 2)
+    # Hashrate (bottom): x=48, y=90 (lower half, row 2)
     hr = get_network_hash_ps()  # e.g. "240 EH/s"
-    draw_left_justified_text(screen_buffer, hr, 108, 90, 90, val_font)
+    draw_left_justified_text(screen_buffer, hr, 48, 90, 90, val_font)
 
 
 def draw_screen6():
@@ -935,39 +954,39 @@ def draw_screen6():
         return
     connections, active_channels = result
 
-    # payment_channels.png layout (128x160 after rotate 90):
-    #   "Payment Channels" label: x=0~10,  y=6~151  (leftmost)
-    #   "Connections" label:      x=30~40, y=7~135  (left-mid, top)
-    #   "Active" label:           x=30~40, y=101~135 (left-mid, bottom)
-    #   "Max Receive" label:      x=60~70, y=7~154  (right-mid, top)
-    #   "Max Send" label:         x=60~70, y=82~154  (right-mid, bottom)
+    # payment_channels.png layout (128x160 after rotate 270):
+    #   "Payment Channels" label: x=111~121 (rightmost)
+    #   "Connections" label:      x=88~96,  y=80~159 (right-mid, bottom half)
+    #   "Active" label:           x=88~96,  y=0~79   (right-mid, top half)
+    #   "Max Receive" label:      x=24~48,  y=0~79   (left-mid, top half)
+    #   "Max Send" label:         x=24~48,  y=80~159 (left-mid, bottom half)
     #
-    #   Numbers go RIGHT of each label:
-    #   Pixel analysis (rot90): all labels x=6~86, empty space x=87~127 (41px)
-    #   Row 1 (x=87~107, 20px): Connections (top) + Active (bottom)
-    #   Row 2 (x=107~127, 20px): Max Receive (top) + Max Send (bottom)
+    #   Numbers go in the EMPTY space between labels:
+    #   Pixel analysis (rot270): labels x=24~48, x=88~96, x=111~121
+    #   Empty space: x=49~87 (39px)
+    #   Row 1 (x=67~87, 21px): Connections (top) + Active (bottom)
+    #   Row 2 (x=49~66, 18px): Max Receive (top) + Max Send (bottom)
     #   y=0~79 (upper half), y=80~159 (lower half)
 
     val_font_lg = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 18)
-    val_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 14)
-    btc_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 11)
+    btc_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 12)
 
-    # Connections (top): x=87, y=10 (upper half, row 1)
-    draw_left_justified_text(screen_buffer, str(connections), 87, 10, 90, val_font_lg)
+    # Connections (top): x=67, y=5 (upper half, row 1)
+    draw_left_justified_text(screen_buffer, str(connections), 67, 5, 90, val_font_lg)
 
-    # Active channels (bottom): x=87, y=90 (lower half, row 1)
-    draw_left_justified_text(screen_buffer, str(active_channels), 87, 90, 90, val_font_lg)
+    # Active channels (bottom): x=67, y=90 (lower half, row 1)
+    draw_left_justified_text(screen_buffer, str(active_channels), 67, 90, 90, val_font_lg)
 
     bal = get_lnd_channel_balance()
     if not bal:
         return
     max_send, max_receive = bal
 
-    # Max Receive (top): x=107, y=10 (upper half, row 2)
-    draw_left_justified_text(screen_buffer, max_receive, 107, 10, 90, btc_font)
+    # Max Receive (top): x=49, y=5 (upper half, row 2)
+    draw_left_justified_text(screen_buffer, max_receive, 49, 5, 90, btc_font)
 
-    # Max Send (bottom): x=107, y=90 (lower half, row 2)
-    draw_left_justified_text(screen_buffer, max_send, 107, 90, 90, btc_font)
+    # Max Send (bottom): x=49, y=90 (lower half, row 2)
+    draw_left_justified_text(screen_buffer, max_send, 49, 90, 90, btc_font)
 
 
 def draw_screen7():
@@ -979,27 +998,27 @@ def draw_screen7():
     used_space, disk_capacity, available_space, used_pct = (
         storage_info[1], storage_info[0], storage_info[2], storage_info[3])
 
-    # storage.png layout (128x160 after rotate 90):
-    #   Storage icon:     x=0~20,  y=10~50  (top-left)
-    #   "Storage" label:  x=25~46, y=10~50  (top-left area)
-    #   Right area x=47~127 is available for text (81px)
+    # storage.png layout (128x160 after rotate 270):
+    #   Storage icon:     x=81~121 (right side)
+    #   "Storage" label:  x=24~46  (right-mid area)
+    #   Empty space:      x=47~80  (34px) → text goes here
     #
-    #   Layout plan (x = row position from top, y = horizontal position):
+    #   Layout plan (x = row position from left, y = horizontal position):
     #   Row 1 (x=47~70):  Used space large text (e.g. "929.1 GB")
-    #   Row 2 (x=75~90):  "Used out of 2TB" small text
-    #   Row 3 (x=92~107): "1.5TB available" small text
-    #   Progress bar (x=108~124): horizontal bar spanning y=5~153
+    #   Row 2 (x=72~84):  "Used out of 2TB" small text
+    #   Row 3 (x=86~98):  "1.5TB available" small text
+    #   Progress bar (x=100~116): horizontal bar spanning y=5~153
 
     draw_left_justified_text(screen_buffer, used_space, 47, 5, 90,
                              ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 22))
-    draw_left_justified_text(screen_buffer, "Used out of " + disk_capacity, 75, 5, 90,
-                             ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 13))
-    draw_left_justified_text(screen_buffer, available_space + " available", 92, 5, 90,
-                             ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 13))
+    draw_left_justified_text(screen_buffer, "Used out of " + disk_capacity, 72, 5, 90,
+                             ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 11))
+    draw_left_justified_text(screen_buffer, available_space + " available", 86, 5, 90,
+                             ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 11))
 
-    # Horizontal progress bar: x=108~124, y=5~153
+    # Horizontal progress bar: x=100~116, y=5~153
     draw_sb = ImageDraw.Draw(screen_buffer)
-    bar_x, bar_y, bar_w, bar_h = 108, 5, 16, 150
+    bar_x, bar_y, bar_w, bar_h = 100, 5, 16, 150
     inner_h = int((used_pct * bar_h) / 100)
     draw_sb.rectangle((bar_x, bar_y, bar_x + bar_w, bar_y + bar_h),
                       outline=(255, 255, 255), width=1)
@@ -1010,7 +1029,7 @@ def draw_screen7():
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
-print('Running Umbrel LCD script - Version: 2.14.9 (Umbrel 1.x compatible)')
+print('Running Umbrel LCD script - Version: 2.15.0 (Umbrel 1.x compatible)')
 
 # Display umbrel logo on startup (duration configurable in config.ini)
 display_background_image('umbrel_logo.png')
