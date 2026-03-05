@@ -16,12 +16,12 @@
 #
 #   Display orientation pipeline:
 #   1. UmbrelLCD.py draws all content rotated 270° CCW onto a 128×160 buffer.
-#   2. image_to_data() converts the buffer to RGB565 with no additional rotation.
-#   3. MADCTL=0x40 (MX=1) sets the hardware scan direction so that the
-#      270° software rotation produces the correct portrait orientation.
+#   2. image_to_data() converts the buffer to RGB565 (no additional flip).
+#   3. MADCTL=0x40 (MX=1, BGR) sets the hardware scan direction so that
+#      the 270° CCW software rotation produces correct portrait orientation.
 #   4. The RGB565 data is sent to the LCD via SPI.
 #
-#   Net transform: 270° CCW software rotation + MADCTL MX=1 = correct portrait.
+#   Net transform: rotate(270 CCW) + MADCTL MX=1 = correct portrait.
 # -------------------------------------------------------------------------------
 
 import numbers
@@ -66,13 +66,12 @@ ST7735_GMCTRN1 = 0xE1
 def image_to_data(image):
     """Convert a PIL Image to a flat list of 16-bit RGB565 bytes.
 
-    After rotate(90 CCW) in UmbrelLCD.py, the buffer rows correspond to the
-    original image columns. A row flip (pb[::-1, :, :]) corrects the
-    left-right mirror visible on hardware with MADCTL=0x40 (MX=1, BGR).
-    Confirmed correct orientation: v2.14.6.
+    UmbrelLCD.py applies rotate(270 CCW) to all images before calling this
+    function. Combined with MADCTL=0x40 (MX=1, BGR), this produces the
+    correct portrait orientation on hardware.
+    No additional row/column flip is needed here.
     """
     pb = np.array(image.convert('RGB')).astype('uint16')
-    pb = pb[::-1, :, :]          # row flip to correct LR mirror (after rotate 90 CCW)
     color = ((pb[:, :, 0] & 0xF8) << 8) | \
             ((pb[:, :, 1] & 0xFC) << 3) | \
              (pb[:, :, 2] >> 3)
