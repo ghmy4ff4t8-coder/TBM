@@ -85,5 +85,5 @@ fi
 
 echo " "
 echo "Setup complete! Please reboot your Raspberry Pi to apply SPI changes."
-echo "After reboot, run umbrelLCDServiceSetup.sh to configure and start the LCD service."
+echo "After reboot, run configure.sh to configure and start the LCD service."
 echo " "

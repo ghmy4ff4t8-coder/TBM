@@ -5,7 +5,7 @@
 #   Changes  :
 #     v2.0.0: Removed multi-language support (English only).
 #             Removed manual timezone input — auto-detected from system.
-#             Removed logo_duration setting (hardcoded to 10s in UmbrelLCD.py).
+#             Removed logo_duration setting (hardcoded to 10s in tbm.py).
 #             Removed screen1_duration (single screen_duration for all screens).
 #     v1.6.0: Fixed syntax error - ES/JA/ZH language blocks were outside T().
 #             Removed screen1_duration; single screen_duration for all screens.
@@ -186,7 +186,7 @@ echo
 cat > "${cwd}/config.ini" << CONFIGEOF
 # ============================================================
 #  TBM (The Bitcoin Machine) - LCD Configuration File
-#  Location: ~/TBM/TBMLCD-v0.5/UmbrelLCDV2_0/config.ini
+#  Location: ~/TBM/app/config.ini
 # ============================================================
 #
 #  Edit this file to change settings without touching the code.
@@ -264,7 +264,7 @@ Restart=on-failure
 RestartSec=30s
 Type=idle
 Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-ExecStart=/usr/bin/python3 ${cwd}/UmbrelLCD.py
+ExecStart=/usr/bin/python3 ${cwd}/tbm.py
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=UmbrelST7735LCD
@@ -284,5 +284,5 @@ echo
 printf "  %-22s sudo journalctl -u UmbrelST7735LCD -f\n"                                   "Check logs:"
 printf "  %-22s sudo systemctl stop UmbrelST7735LCD\n"                                      "Stop service:"
 printf "  %-22s sudo systemctl restart UmbrelST7735LCD\n"                                   "Restart service:"
-printf "  %-22s sudo systemctl stop UmbrelST7735LCD && bash umbrelLCDServiceSetup.sh\n"     "Re-run setup:"
+printf "  %-22s sudo systemctl stop UmbrelST7735LCD && bash configure.sh\n"     "Re-run setup:"
 echo
