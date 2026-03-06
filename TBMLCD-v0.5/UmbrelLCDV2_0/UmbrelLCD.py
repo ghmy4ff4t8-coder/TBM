@@ -1,7 +1,7 @@
 
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.29.0 (Umbrel 1.x compatible fork)
+#   Version  : 2.30.0 (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
 #    # v2.24.0: Screen transition default changed to 3s. Screen2 bottom numbers right-aligned.
@@ -1094,36 +1094,27 @@ def draw_screen6():
     #   Row 2 (x=49~66, 18px): Max Receive (top) + Max Send (bottom)
     #   y=0~79 (upper half), y=80~159 (lower half)
 
-    n = len(str(connections))
-    conn_y = 23 if n == 2 else (27 if n == 1 else 19)
-    conn_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 15)
-    draw_left_justified_text(screen_buffer, str(connections), 68, conn_y, 270, conn_font)
-    n = len(str(active_channels))
-    ch_y = 101 if n == 2 else (108 if n == 1 else 98)
-    ch_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 15)
-    draw_left_justified_text(screen_buffer, str(active_channels), 68, ch_y, 270, ch_font)
-    label_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 9)
-    draw_left_justified_text(screen_buffer, "Channels", 55, 98, 270, label_font)
-    draw_left_justified_text(screen_buffer, "Peers", 55, 22, 270, label_font)
+    # Same layout as Screen5 (Network): font=11, x_top=62, x_bot=14, y_left=9, y_right=89
+    data_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 11)
+
+    # Connections (top-right quadrant): value + "Peers" on same line
+    draw_left_justified_text(screen_buffer, str(connections) + " Peers", 62, 9, 270, data_font)
+
+    # Active channels (bottom-right quadrant): value + "Active" on same line
+    draw_left_justified_text(screen_buffer, str(active_channels) + " Active", 62, 89, 270, data_font)
+
     bal = get_lnd_channel_balance()
     if not bal:
         return
     max_send, max_receive = bal
     send_val, send_unit = max_send.split()[0], max_send.split()[1]
     recv_val, recv_unit = max_receive.split()[0], max_receive.split()[1]
-    n = len(send_val)
-    send_y_map = {1: 27, 2: 23, 3: 19, 4: 15, 5: 10}
-    send_y = send_y_map.get(n, 6)
-    send_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 15)
-    draw_left_justified_text(screen_buffer, send_val, 22, send_y, 270, send_font)
-    n = len(recv_val)
-    recv_y_map = {1: 108, 2: 101, 3: 98, 4: 93, 5: 90}
-    recv_y = recv_y_map.get(n, 90)
-    recv_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 15)
-    draw_left_justified_text(screen_buffer, recv_val, 22, recv_y, 270, recv_font)
-    btc_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 10)
-    draw_left_justified_text(screen_buffer, recv_unit, 8, 100, 270, btc_font)
-    draw_left_justified_text(screen_buffer, send_unit, 8, 22, 270, btc_font)
+
+    # Max Send (top-left quadrant): value + unit on same line
+    draw_left_justified_text(screen_buffer, send_val + " " + send_unit, 14, 9, 270, data_font)
+
+    # Max Receive (bottom-left quadrant): value + unit on same line
+    draw_left_justified_text(screen_buffer, recv_val + " " + recv_unit, 14, 89, 270, data_font)
 
 
 def draw_screen7():
@@ -1153,7 +1144,7 @@ def draw_screen7():
     draw_left_justified_text(screen_buffer, "Used out of " + disk_capacity, 43, 7, 270,
                              ImageFont.truetype(poppins_fonts_path + "Poppins-Regular.ttf", 10))
     # Available space: right-aligned (space already included in classify_kilo_bytes output)
-    draw_right_justified_text(screen_buffer, available_space + " available", 13, 11, 270,
+    draw_right_justified_text(screen_buffer, available_space + "  available", 13, 11, 270,
                               ImageFont.truetype(poppins_fonts_path + "Poppins-Regular.ttf", 10))
     # Progress bar
     draw_sb = ImageDraw.Draw(screen_buffer)
@@ -1166,7 +1157,7 @@ def draw_screen7():
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
-print('Running Umbrel LCD script - Version: 2.28.0 (Umbrel 1.x compatible)')
+print('Running Umbrel LCD script - Version: 2.30.0 (Umbrel 1.x compatible)')
 
 # Display umbrel logo on startup (duration configurable in config.ini)
 display_background_image('umbrel_logo.png')
