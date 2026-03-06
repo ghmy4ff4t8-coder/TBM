@@ -1,7 +1,7 @@
 
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.28.0 (Umbrel 1.x compatible fork)
+#   Version  : 2.29.0 (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
 #    # v2.24.0: Screen transition default changed to 3s. Screen2 bottom numbers right-aligned.
@@ -1040,36 +1040,37 @@ def draw_screen5():
     # x=55~72: data row for top section (below Connections/Mempool labels at x=86~94)
     # x=8~22:  data row for bottom section (below Hashrate/Blockchain labels at x=24~47)
     # Original design: value + unit on SAME line (e.g. "10 Peers", "8 MB")
-    data_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 16)
+    # A1 layout: font=11, x_top=62, x_bot=14, y_left=9, y_right=89
+    data_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 11)
 
-    # Connections (top-right quadrant, x=55): value + "Peers" on same line
+    # Connections (top-right quadrant, x=62): value + "Peers" on same line
     conn = get_connection_count()
     conn_str = str(conn) if conn is not False else "--"
-    draw_left_justified_text(screen_buffer, conn_str + " Peers", 55, 20, 270, data_font)
+    draw_left_justified_text(screen_buffer, conn_str + " Peers", 62, 9, 270, data_font)
 
-    # Mempool (bottom-right quadrant, x=55): value + unit on same line
+    # Mempool (bottom-right quadrant, x=62): value + unit on same line
     mem = get_mempool_info()
     if mem and isinstance(mem, str) and len(mem.split()) >= 2:
         mem_val, mem_unit = mem.split()[0], mem.split()[1]
     else:
         mem_val, mem_unit = "--", "MB"
-    draw_left_justified_text(screen_buffer, mem_val + " " + mem_unit, 55, 98, 270, data_font)
+    draw_left_justified_text(screen_buffer, mem_val + " " + mem_unit, 62, 89, 270, data_font)
 
-    # Hashrate (bottom-left quadrant, x=8): value + unit on same line
+    # Hashrate (bottom-left quadrant, x=14): value + unit on same line
     hr = get_network_hash_ps()
     if hr and isinstance(hr, str) and len(hr.split()) >= 2:
         hr_val, hr_unit = hr.split()[0], hr.split()[1]
     else:
         hr_val, hr_unit = "--", "EH/s"
-    draw_left_justified_text(screen_buffer, hr_val + " " + hr_unit, 8, 20, 270, data_font)
+    draw_left_justified_text(screen_buffer, hr_val + " " + hr_unit, 14, 9, 270, data_font)
 
-    # Blockchain size (top-left quadrant, x=8): value + unit on same line
+    # Blockchain size (top-left quadrant, x=14): value + unit on same line
     bs = get_blockchain_size()
     if bs and isinstance(bs, str) and len(bs.split()) >= 2:
         bs_val, bs_unit = bs.split()[0], bs.split()[1]
     else:
         bs_val, bs_unit = "--", "GB"
-    draw_left_justified_text(screen_buffer, bs_val + " " + bs_unit, 8, 98, 270, data_font)
+    draw_left_justified_text(screen_buffer, bs_val + " " + bs_unit, 14, 89, 270, data_font)
 
 
 def draw_screen6():
