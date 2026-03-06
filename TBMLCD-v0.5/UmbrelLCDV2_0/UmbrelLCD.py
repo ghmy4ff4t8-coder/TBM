@@ -1,10 +1,13 @@
 
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.21.0 (Umbrel 1.x compatible fork)
+#   Version  : 2.22.0 (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
-#    # v2.21.0: Screen1 layout precision improvements.
+#    # v2.22.0: Screen1 icon gap adjusted to 15px (middle value). SATS/USD and temperature
+    #           combined into single string for guaranteed same-line alignment.
+    #           Temperature now reads from /sys/class/thermal/thermal_zone0/temp (Umbrel/RPi).
+    # v2.21.0: Screen1 layout precision improvements.
 #           BTC price number x aligned to icon center (ideal_x 79→74).
 #           SAT number x aligned to icon center (ideal_x 24→21).
 #           Temperature placed exactly on same line as SATS/USD label
@@ -812,9 +815,9 @@ def display_price_text(currency):
         # Currency label: 12px, right-justified at get_inverted_x(1,12), y=4
         # SATS/USD label: 14px, left-justified at get_inverted_x(111,14), y=39
 
-        # Icons: 27px (original size)
-        display_icon(screen_buffer, images_path + 'bitcoin_seeklogo.png', (80, 2), 27)
-        display_icon(screen_buffer, images_path + 'Satoshi_regular_elipse.png', (27, 2), 27)
+        # Icons: 27px. BTC x=75 (center=88), SAT x=33 (center=46) - gap=15px between icons
+        display_icon(screen_buffer, images_path + 'bitcoin_seeklogo.png', (75, 2), 27)
+        display_icon(screen_buffer, images_path + 'Satoshi_regular_elipse.png', (33, 2), 27)
 
         price = get_btc_price(currency)
         newPrice = str(price)
@@ -823,9 +826,8 @@ def display_price_text(currency):
         # BTC price font size: original formula int(195/n)
         price_font_size = int(195 / n) if n > 0 else 12
         price_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", price_font_size)
-        # x: ideal_x=74 centers the number vertically with the BTC icon (center=93)
-        # get_corrected_x_position shifts x down for smaller fonts
-        price_x = get_corrected_x_position(39, price_font_size, 74)
+        # x: ideal_x=69 centers the number vertically with the BTC icon (center=88)
+        price_x = get_corrected_x_position(39, price_font_size, 69)
         draw_left_justified_text(screen_buffer, newPrice, price_x, 36, 270, price_font)
 
         # Currency label: 12px, right-justified
@@ -837,41 +839,37 @@ def display_price_text(currency):
         n2 = len(sat_val)
         sat_font_size = min(int(195 / n2) if n2 > 0 else 12, price_font_size)
         sat_font2 = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", sat_font_size)
-        # x: ideal_x=21 centers the number vertically with the SAT icon (center=40)
-        sat_x = get_corrected_x_position(39, sat_font_size, 21)
+        # x: ideal_x=27 centers the number vertically with the SAT icon (center=46)
+        sat_x = get_corrected_x_position(39, sat_font_size, 27)
         draw_left_justified_text(screen_buffer, sat_val, sat_x, 36, 270, sat_font2)
 
-        # SATS/USD label: 14px, left-justified
-        sats_msg = "SATS / " + currency
+        # SATS/USD + temperature on the SAME line: combine into one string
+        # This guarantees perfect alignment - single draw call, single x position
+        temperature = get_temperature()
+        sats_msg = "SATS / " + currency + "   " + temperature
         bottom_label_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 14)
         bottom_x = get_inverted_x(111, 14)
-        draw_left_justified_text(screen_buffer, sats_msg, bottom_x, 39, 270, bottom_label_font)
+        draw_left_justified_text(screen_buffer, sats_msg, bottom_x, 47, 270, bottom_label_font)
     except Exception as e:
         print("Error creating price text;", str(e))
 
 
-def display_temperature():
-    temperature = "--'C"
+def get_temperature():
+    """Read CPU temperature and return as string like '51'C'. Returns '--'C' on failure."""
     try:
-        # Try /sys/class/thermal first (works on Raspberry Pi / Umbrel)
         with open('/sys/class/thermal/thermal_zone0/temp') as f:
-            temperature = str(int(int(f.read().strip()) / 1000)) + "'C"
+            return str(int(int(f.read().strip()) / 1000)) + "'C"
     except Exception:
-        try:
-            r = subprocess.run(['vcgencmd', 'measure_temp'],
-                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-            if r.returncode == 0:
-                raw = r.stdout.decode().replace("temp=", "").replace("'C", "").strip()
-                temperature = str(int(float(raw))) + "'C"
-        except Exception:
-            temperature = "--'C"
-    # Place temperature on the SAME x-row as SATS/USD label.
-    # SATS/USD uses draw_left_justified_text at x=bottom_x, y=39.
-    # Temperature is right-aligned on the same row: y=120 (right side of screen)
-    temp_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 14)
-    bottom_x = get_inverted_x(111, 14)
-    # y=122: SATS/USD starts at y=39, width=77px → ends at y=116; gap=6 → temp at y=122
-    draw_left_justified_text(screen_buffer, temperature, bottom_x, 122, 270, temp_font)
+        pass
+    try:
+        r = subprocess.run(['vcgencmd', 'measure_temp'],
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if r.returncode == 0:
+            raw = r.stdout.decode().replace("temp=", "").replace("'C", "").strip()
+            return str(int(float(raw))) + "'C"
+    except Exception:
+        pass
+    return "--'C"
 
 
 def display_block_count_text():
@@ -893,8 +891,7 @@ def display_block_count_text():
 
 
 def draw_screen1(currency):
-    display_price_text(currency)
-    display_temperature()
+    display_price_text(currency)  # temperature is now included inside display_price_text
 
 
 def draw_screen2():
@@ -1126,7 +1123,7 @@ def draw_screen7():
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
-print('Running Umbrel LCD script - Version: 2.20.0 (Umbrel 1.x compatible)')
+print('Running Umbrel LCD script - Version: 2.22.0 (Umbrel 1.x compatible)')
 
 # Display umbrel logo on startup (duration configurable in config.ini)
 display_background_image('umbrel_logo.png')
