@@ -1,9 +1,15 @@
 
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.18.0 (Umbrel 1.x compatible fork)
+#   Version  : 2.19.0 (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
+#    # v2.19.0: Fixed layout issues found in hardware testing.
+#           Screen1: Fixed BTC price number being clipped (y overflow). Reduced font
+#                    sizing formula to fit 120px available width. Icons repositioned.
+#           Screen2: Fixed fee boxes showing only 1 number (both were centered at
+#                    same y position). Now each box has its own y coordinate.
+#           Screen7: Improved 'Used out of' text spacing, switched to Poppins-Regular.
 #    # v2.18.0: Layout improvements to match original thebitcoinmachines.com LCD faces.
 #           Screen1: Increased BTC price and SAT font sizes (removed 32px cap, now 48px max).
 #                    Icons repositioned to match original design.
@@ -800,38 +806,52 @@ def display_price_text(currency):
         #     SAT number:    x=0~25,  y=2~159 (large, fills width)
         #     SATS/USD label: x=0~12, y=2~80  (small)
 
-        # Icons: 36px, placed at top of each half
-        display_icon(screen_buffer, images_path + 'bitcoin_seeklogo.png', (90, 2), 36)
-        display_icon(screen_buffer, images_path + 'Satoshi_regular_elipse.png', (28, 2), 36)
+        # Layout after rotate(270): screen_buffer is 128(H) x 160(W)
+        # x = top-to-bottom (0=top, 127=bottom)
+        # y = left-to-right (0=left, 159=right)
+        #
+        # Design: icon on LEFT side (y=2~37, 36px icon),
+        #         number fills RIGHT side (y=40~159 = 120px available)
+        #
+        # Top half (x=64~127): BTC price row
+        # Bottom half (x=0~63): SAT price row
+        #
+        # Font sizing: available y-width = 120px for numbers starting at y=40
+        # Per-digit width at font_size px is roughly font_size * 0.6
+        # So max digits that fit: 120 / (font_size * 0.6)
+        # For 5 digits: font_size = 120 / (5 * 0.6) = 40px → fits perfectly
+        # For 4 digits: font_size = 120 / (4 * 0.6) = 50px → cap at 48
+
+        # Icons: 36px, placed left side of each half
+        display_icon(screen_buffer, images_path + 'bitcoin_seeklogo.png', (78, 2), 36)
+        display_icon(screen_buffer, images_path + 'Satoshi_regular_elipse.png', (14, 2), 36)
 
         price = get_btc_price(currency)
         newPrice = str(price)
         n = len(newPrice)
 
-        # BTC price: large font, fills available width (y=38~159 = 121px)
-        # Font size: scale to fit 121px width for n digits
-        # 5 digits: ~24px font fits nicely; use dynamic sizing
-        price_font_size = min(int(580 / max(n, 1)), 48)
+        # BTC price: y=40~159 (120px), x centered in top half (x=64~127=63px)
+        # font_size per digit: 120 / (n * 0.62), cap at 48
+        price_font_size = min(int(120 / max(n * 0.62, 1)), 48)
         price_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", price_font_size)
-        # x position: vertically centered in top half (x=64~127 = 63px)
         price_x = 64 + max(0, (63 - price_font_size) // 2)
-        draw_left_justified_text(screen_buffer, newPrice, price_x, 38, 270, price_font)
+        draw_left_justified_text(screen_buffer, newPrice, price_x, 40, 270, price_font)
 
-        # Currency label: small, bottom-right of top half
-        cur_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 11)
-        draw_right_justified_text(screen_buffer, currency, 64, 2, 270, cur_font)
+        # Currency label: small, right-aligned at top of top half
+        cur_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 10)
+        draw_right_justified_text(screen_buffer, currency, 116, 2, 270, cur_font)
 
-        # SAT value: same large font as price
+        # SAT value: same sizing logic, y=40~159
         sat_val = str(int(100_000_000 / price)) if price else "0"
         n2 = len(sat_val)
-        sat_font_size = min(int(580 / max(n2, 1)), 48)
+        sat_font_size = min(int(120 / max(n2 * 0.62, 1)), 48)
         sat_font2 = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", sat_font_size)
         sat_x = max(0, (63 - sat_font_size) // 2)
-        draw_left_justified_text(screen_buffer, sat_val, sat_x, 38, 270, sat_font2)
+        draw_left_justified_text(screen_buffer, sat_val, sat_x, 40, 270, sat_font2)
 
-        # SATS/USD label: small, bottom of lower half
-        sat_label_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 11)
-        draw_left_justified_text(screen_buffer, "SATS / " + currency, 0, 38, 270, sat_label_font)
+        # SATS/USD label: small, right-aligned at top of bottom half
+        sat_label_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 10)
+        draw_right_justified_text(screen_buffer, "SATS/" + currency, 52, 2, 270, sat_label_font)
     except Exception as e:
         print("Error creating price text;", str(e))
 
@@ -890,20 +910,33 @@ def draw_screen2():
     #
     # Fee numbers go inside the boxes, centered.
     # Box height = 40px → font ~36px for 1-2 digits, ~24px for 3 digits
-    high = int(fees_dict['fastestFee'])
-    low = int(fees_dict['hourFee'])
+    # TxsBG.png box layout (after rotate 270, 128H x 160W):
+    #   Left box:  y=4~77  (74px wide), x=88~127 (40px tall)
+    #   Right box: y=83~156 (74px wide), x=88~127 (40px tall)
+    # fee number is centered inside each box
+    high = int(fees_dict['fastestFee'])  # fastest fee -> right box
+    low = int(fees_dict['hourFee'])      # hour fee    -> left box
     def fee_font_size(n):
-        # Fill the 40px box height: 1-2 digits=36px, 3 digits=28px
-        return 36 if n <= 2 else (28 if n == 3 else 20)
+        # Box is 40px tall: 1-2 digits=34px, 3 digits=26px, 4+=20px
+        return 34 if n <= 2 else (26 if n == 3 else 20)
     low_fs = fee_font_size(len(str(low)))
     high_fs = fee_font_size(len(str(high)))
-    # x position: center in box (x=88~127, height=40px)
+    # x: center vertically in box (x=88~127, 40px)
     low_x = 88 + max(0, (40 - low_fs) // 2)
     high_x = 88 + max(0, (40 - high_fs) // 2)
-    draw_centered_text(screen_buffer, str(low), low_x, 270,
-                       ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", low_fs))
-    draw_centered_text(screen_buffer, str(high), high_x, 270,
-                       ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", high_fs))
+    # y: center horizontally in each box
+    # Left box center y = (4+77)//2 = 40; right box center y = (83+156)//2 = 119
+    # draw_left_justified_text places text at (x, y) top-left corner
+    # so subtract half the text width to center it
+    # Estimate text width: font_size * 0.6 * num_digits
+    low_tw = int(low_fs * 0.62 * len(str(low)))
+    high_tw = int(high_fs * 0.62 * len(str(high)))
+    low_y = max(4, 40 - low_tw // 2)    # left box center y=40
+    high_y = max(83, 119 - high_tw // 2) # right box center y=119
+    draw_left_justified_text(screen_buffer, str(low), low_x, low_y, 270,
+                             ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", low_fs))
+    draw_left_justified_text(screen_buffer, str(high), high_x, high_y, 270,
+                             ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", high_fs))
     # Next block TX count: middle row, large
     txs = int(next_block_dict['nTx'])
     txs_n = len(str(txs))
@@ -1074,12 +1107,16 @@ def draw_screen7():
     #   Row 3 (x=50~60):  "1.5TB available" small text
     #   Progress bar (x=65~77): moved to avoid icon overlap
 
+    # Used space: large text
     draw_left_justified_text(screen_buffer, used_space, 59, 7, 270,
                              ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 20))
-    draw_left_justified_text(screen_buffer, "Used out of " + disk_capacity, 44, 7, 270,
-                             ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 11))
+    # "Used out of X" with a space before disk_capacity for readability
+    draw_left_justified_text(screen_buffer, "Used out of " + disk_capacity, 43, 7, 270,
+                             ImageFont.truetype(poppins_fonts_path + "Poppins-Regular.ttf", 10))
+    # Available space: right-aligned
     draw_right_justified_text(screen_buffer, available_space + " available", 13, 11, 270,
-                              ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 11))
+                              ImageFont.truetype(poppins_fonts_path + "Poppins-Regular.ttf", 10))
+    # Progress bar
     draw_sb = ImageDraw.Draw(screen_buffer)
     x, y, w, h = 29, 7, 2, 140
     inner_h = int((used_pct * h) / 100) + y
@@ -1090,7 +1127,7 @@ def draw_screen7():
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
-print('Running Umbrel LCD script - Version: 2.17.0 (Umbrel 1.x compatible)')
+print('Running Umbrel LCD script - Version: 2.19.0 (Umbrel 1.x compatible)')
 
 # Display umbrel logo on startup (duration configurable in config.ini)
 display_background_image('umbrel_logo.png')
