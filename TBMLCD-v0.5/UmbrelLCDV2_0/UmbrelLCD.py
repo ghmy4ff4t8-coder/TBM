@@ -1,9 +1,19 @@
 
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.19.0 (Umbrel 1.x compatible fork)
+#   Version  : 2.20.0 (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
+#    # v2.20.0: Calibrated all screen coordinates to match original doidotech/TBM v2.0.1.
+#           Screen1: Restored original font formula int(195/n) for BTC price,
+#                    int(200/n) for SAT value, icon size 27px (was 36px),
+#                    icon positions BTC(80,2) SAT(27,2), y=30 (was y=40).
+#                    Currency label 12px right-justified, SATS/USD 14px left-justified.
+#           Screen2: Restored original font_constant=86 for fee boxes, y=9 (low)
+#                    and y=88 (high), font_constant=112 for next block TXs,
+#                    font_constant=120 for unconfirmed TXs.
+#           Screen3: Restored original hard_font_size=40, x=get_inverted_x(72,40)=16.
+#           Simulator: Updated simulate_screens.py to match all above changes.
 #    # v2.19.0: Fixed layout issues found in hardware testing.
 #           Screen1: Fixed BTC price number being clipped (y overflow). Reduced font
 #                    sizing formula to fit 120px available width. Icons repositioned.
@@ -789,69 +799,45 @@ def get_btc_network():
 def display_price_text(currency):
     try:
         display_background_image('Screen1@288x.png')
-        # Screen1@288x.png layout (128x160 after rotate 270):
-        # Original TBM design: icon on left, large price number filling the screen.
-        #
-        # After rotate(270): screen is 128 tall x 160 wide in pixel coords.
-        # x = row from top (0=top, 127=bottom)
-        # y = column from left (0=left, 159=right)
-        #
-        # Layout (matching original thebitcoinmachines.com design):
-        #   Top half    (x=64~127): BTC price row
-        #     Bitcoin icon:  x=90~127, y=2~35  (36px icon, top-right)
-        #     Price number:  x=64~89,  y=2~159 (large, fills width)
-        #     Currency label: x=64~75, y=145~159 (small, bottom-right)
-        #   Bottom half (x=0~63):  SAT price row
-        #     Satoshi icon:  x=26~63, y=2~35  (36px icon)
-        #     SAT number:    x=0~25,  y=2~159 (large, fills width)
-        #     SATS/USD label: x=0~12, y=2~80  (small)
+        # Original TBM design (doidotech/TBM v2.0.1) coordinates preserved exactly.
+        # Icons: 27px, BTC at (80,2), SAT at (27,2)
+        # BTC price: font_size=int(195/n), x=get_corrected_x_pos(39,fs,79), y=30
+        # SAT value: font_size=int(200/n) if n>4 else 50, x=get_corrected_x_pos(50,fs,24), y=30
+        # Currency label: 12px, right-justified at get_inverted_x(1,12), y=4
+        # SATS/USD label: 14px, left-justified at get_inverted_x(111,14), y=39
 
-        # Layout after rotate(270): screen_buffer is 128(H) x 160(W)
-        # x = top-to-bottom (0=top, 127=bottom)
-        # y = left-to-right (0=left, 159=right)
-        #
-        # Design: icon on LEFT side (y=2~37, 36px icon),
-        #         number fills RIGHT side (y=40~159 = 120px available)
-        #
-        # Top half (x=64~127): BTC price row
-        # Bottom half (x=0~63): SAT price row
-        #
-        # Font sizing: available y-width = 120px for numbers starting at y=40
-        # Per-digit width at font_size px is roughly font_size * 0.6
-        # So max digits that fit: 120 / (font_size * 0.6)
-        # For 5 digits: font_size = 120 / (5 * 0.6) = 40px → fits perfectly
-        # For 4 digits: font_size = 120 / (4 * 0.6) = 50px → cap at 48
-
-        # Icons: 36px, placed left side of each half
-        display_icon(screen_buffer, images_path + 'bitcoin_seeklogo.png', (78, 2), 36)
-        display_icon(screen_buffer, images_path + 'Satoshi_regular_elipse.png', (14, 2), 36)
+        # Icons: 27px (original size)
+        display_icon(screen_buffer, images_path + 'bitcoin_seeklogo.png', (80, 2), 27)
+        display_icon(screen_buffer, images_path + 'Satoshi_regular_elipse.png', (27, 2), 27)
 
         price = get_btc_price(currency)
         newPrice = str(price)
         n = len(newPrice)
 
-        # BTC price: y=40~159 (120px), x centered in top half (x=64~127=63px)
-        # font_size per digit: 120 / (n * 0.62), cap at 48
-        price_font_size = min(int(120 / max(n * 0.62, 1)), 48)
+        # BTC price font size: original formula int(195/n)
+        price_font_size = int(195 / n) if n > 0 else 12
         price_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", price_font_size)
-        price_x = 64 + max(0, (63 - price_font_size) // 2)
-        draw_left_justified_text(screen_buffer, newPrice, price_x, 40, 270, price_font)
+        # x position corrected for smaller fonts (original: ideal=39, ideal_x=79)
+        price_x = get_corrected_x_position(39, price_font_size, 79)
+        draw_left_justified_text(screen_buffer, newPrice, price_x, 30, 270, price_font)
 
-        # Currency label: small, right-aligned at top of top half
-        cur_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 10)
-        draw_right_justified_text(screen_buffer, currency, 116, 2, 270, cur_font)
+        # Currency label: 12px, right-justified
+        cur_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 12)
+        draw_right_justified_text(screen_buffer, currency, get_inverted_x(1, 12), 4, 270, cur_font)
 
-        # SAT value: same sizing logic, y=40~159
+        # SAT value
         sat_val = str(int(100_000_000 / price)) if price else "0"
         n2 = len(sat_val)
-        sat_font_size = min(int(120 / max(n2 * 0.62, 1)), 48)
+        sat_font_size = int(200 / n2) if n2 > 4 else 50
         sat_font2 = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", sat_font_size)
-        sat_x = max(0, (63 - sat_font_size) // 2)
-        draw_left_justified_text(screen_buffer, sat_val, sat_x, 40, 270, sat_font2)
+        # x position corrected for smaller fonts (original: ideal=50, ideal_x=24)
+        sat_x = get_corrected_x_position(50, sat_font_size, 24)
+        draw_left_justified_text(screen_buffer, sat_val, sat_x, 30, 270, sat_font2)
 
-        # SATS/USD label: small, right-aligned at top of bottom half
-        sat_label_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 10)
-        draw_right_justified_text(screen_buffer, "SATS/" + currency, 52, 2, 270, sat_label_font)
+        # SATS/USD label: 14px, left-justified
+        sats_msg = "SATS / " + currency
+        sat_label_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 14)
+        draw_left_justified_text(screen_buffer, sats_msg, get_inverted_x(111, 14), 39, 270, sat_label_font)
     except Exception as e:
         print("Error creating price text;", str(e))
 
@@ -882,12 +868,10 @@ def display_block_count_text():
         # Original TBM design: block number shown large at bottom of screen,
         # centered horizontally. x=2~22 is the bottom strip (after rotate 270).
         btc_current_block = get_block_count()
-        n = len(str(btc_current_block))
-        # Scale font to fill ~150px width: 6 digits=24px, 7 digits=20px
-        fs = 24 if n <= 6 else (20 if n == 7 else 16)
-        font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", fs)
-        # Place at bottom strip (x=2), centered horizontally (y-axis)
-        draw_centered_text(screen_buffer, btc_current_block, 2, 270, font)
+        # Original TBM design: hard_font_size=40, x=get_inverted_x(72,40)=128-(72+40)=16
+        hard_font_size = 40
+        block_num_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", hard_font_size)
+        draw_centered_text(screen_buffer, btc_current_block, get_inverted_x(72, hard_font_size), 270, block_num_font)
     except Exception as e:
         print("Error creating block count text;", str(e))
 
@@ -902,56 +886,55 @@ def draw_screen2():
     next_block_dict = get_next_block_info()
     unconfirmed_txs = get_unconfirmed_txs()
     display_background_image('TxsBG.png')
-    # TxsBG.png layout (128x160 after rotate 270):
-    #   Two fee boxes at top: left box y=0~78, right box y=81~159
-    #   Each box spans x=88~127 (40px tall)
-    #   Middle row (x=43~87): TXs label + next block tx count
-    #   Bottom row (x=0~42): icons + unconfirmed tx count
-    #
-    # Fee numbers go inside the boxes, centered.
-    # Box height = 40px → font ~36px for 1-2 digits, ~24px for 3 digits
-    # TxsBG.png box layout (after rotate 270, 128H x 160W):
-    #   Left box:  y=4~77  (74px wide), x=88~127 (40px tall)
-    #   Right box: y=83~156 (74px wide), x=88~127 (40px tall)
-    # fee number is centered inside each box
-    high = int(fees_dict['fastestFee'])  # fastest fee -> right box
-    low = int(fees_dict['hourFee'])      # hour fee    -> left box
-    def fee_font_size(n):
-        # Box is 40px tall: 1-2 digits=34px, 3 digits=26px, 4+=20px
-        return 34 if n <= 2 else (26 if n == 3 else 20)
-    low_fs = fee_font_size(len(str(low)))
-    high_fs = fee_font_size(len(str(high)))
-    # x: center vertically in box (x=88~127, 40px)
-    low_x = 88 + max(0, (40 - low_fs) // 2)
-    high_x = 88 + max(0, (40 - high_fs) // 2)
-    # y: center horizontally in each box
-    # Left box center y = (4+77)//2 = 40; right box center y = (83+156)//2 = 119
-    # draw_left_justified_text places text at (x, y) top-left corner
-    # so subtract half the text width to center it
-    # Estimate text width: font_size * 0.6 * num_digits
-    low_tw = int(low_fs * 0.62 * len(str(low)))
-    high_tw = int(high_fs * 0.62 * len(str(high)))
-    low_y = max(4, 40 - low_tw // 2)    # left box center y=40
-    high_y = max(83, 119 - high_tw // 2) # right box center y=119
-    draw_left_justified_text(screen_buffer, str(low), low_x, low_y, 270,
-                             ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", low_fs))
-    draw_left_justified_text(screen_buffer, str(high), high_x, high_y, 270,
-                             ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", high_fs))
-    # Next block TX count: middle row, large
-    txs = int(next_block_dict['nTx'])
-    txs_n = len(str(txs))
-    txs_fs = int(140 / txs_n) if txs_n > 3 else 40
-    txs_fs = min(txs_fs, 40)
-    txs_x = 43 + max(0, (44 - txs_fs) // 2)
-    draw_left_justified_text(screen_buffer, str(txs), txs_x, 67, 270,
-                             ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", txs_fs))
-    # Unconfirmed TX count: bottom row, large
-    u_n = len(unconfirmed_txs)
-    u_fs = int(140 / u_n) if u_n > 4 else 32
-    u_fs = min(u_fs, 32)
-    u_x = 7 + max(0, (36 - u_fs) // 2)
-    draw_left_justified_text(screen_buffer, unconfirmed_txs, u_x, 64, 270,
-                             ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", u_fs))
+    # Original TBM design (doidotech/TBM v2.0.1) coordinates preserved exactly.
+    high = int(fees_dict['fastestFee'])
+    low = int(fees_dict['hourFee'])
+
+    # Calculate font size for low fee (original: font_constant=86)
+    low_number_of_chars = len(str(low))
+    font_constant = 86
+    if low_number_of_chars > 2:
+        low_font_size = int(font_constant / low_number_of_chars)
+    else:
+        low_font_size = 43
+
+    # Calculate font size for high fee
+    high_number_of_chars = len(str(high))
+    if high_number_of_chars > 2:
+        high_font_size = int(font_constant / high_number_of_chars)
+    else:
+        high_font_size = 43
+
+    # x position depending on digit count (original values)
+    low_fee_x = 90 if low_number_of_chars == 3 else 85
+    high_fee_x = 90 if high_number_of_chars == 3 else 85
+
+    # Display low and high fees (original y positions: low=9, high=88)
+    low_fees_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", low_font_size)
+    high_fees_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", high_font_size)
+    draw_left_justified_text(screen_buffer, str(low), low_fee_x, 9, 270, low_fees_font)
+    draw_left_justified_text(screen_buffer, str(high), high_fee_x, 88, 270, high_fees_font)
+
+    # Next block TX count (original: font_constant=112, x=43, y=67)
+    transactions = int(next_block_dict['nTx'])
+    txs_number_of_chars = len(str(transactions))
+    font_constant = 112
+    if txs_number_of_chars > 4:
+        txs_font_size = int(font_constant / txs_number_of_chars)
+    else:
+        txs_font_size = 28
+    txs_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", txs_font_size)
+    draw_left_justified_text(screen_buffer, str(transactions), 43, 67, 270, txs_font)
+
+    # Unconfirmed TX count (original: font_constant=120, x=7, y=64)
+    unconfirmed_txs_number_of_chars = len(unconfirmed_txs)
+    font_constant = 120
+    if unconfirmed_txs_number_of_chars > 5:
+        unconfirmed_txs_font_size = int(font_constant / unconfirmed_txs_number_of_chars)
+    else:
+        unconfirmed_txs_font_size = 24
+    unconfirmed_txs_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", unconfirmed_txs_font_size)
+    draw_left_justified_text(screen_buffer, unconfirmed_txs, 7, 64, 270, unconfirmed_txs_font)
 
 
 def draw_screen3():
@@ -1127,7 +1110,7 @@ def draw_screen7():
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
-print('Running Umbrel LCD script - Version: 2.19.0 (Umbrel 1.x compatible)')
+print('Running Umbrel LCD script - Version: 2.20.0 (Umbrel 1.x compatible)')
 
 # Display umbrel logo on startup (duration configurable in config.ini)
 display_background_image('umbrel_logo.png')
