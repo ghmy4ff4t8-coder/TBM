@@ -787,7 +787,7 @@ def display_price_text(currency):
             if raw_sat < 1:
                 sat_val = f"{raw_sat:.2f}"
             else:
-                sat_val = str(int(raw_sat))
+                sat_val = f"{int(raw_sat):,}"
         else:
             sat_val = "0"
         n2 = len(sat_val)
