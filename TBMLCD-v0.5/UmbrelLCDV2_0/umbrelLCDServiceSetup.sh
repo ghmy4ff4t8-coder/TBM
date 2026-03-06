@@ -75,7 +75,10 @@ T() {
                 DURATION_INTRO)    echo "Enter the time in seconds for each screen to be displayed." ;;
                 DURATION_DEFAULT)  echo "Press Enter to keep the current default value." ;;
                 DUR_LOGO)          echo "Umbrel logo at startup (current default: ${2}s): " ;;
-                DUR_OTHER)         echo "All screens duration (current default: ${2}s): " ;;
+                DUR_OTHER)         echo "Info screen duration (current default: ${2}s): " ;;
+                TZ_PROMPT)         echo "Enter timezone (e.g. Asia/Seoul, America/New_York, Europe/London): " ;;
+                TZ_INVALID)        echo "Invalid timezone. Please try again." ;;
+                TZ_VALID)          echo "✔ Timezone set to: $2" ;;
                 DUR_VALID)         echo "✔ $2 duration: ${3}s" ;;
                 INVALID_NUM)       echo "Please enter a positive integer." ;;
                 CONFIG_GENERATED)  echo "✔ config.ini generated successfully." ;;
@@ -111,7 +114,10 @@ T() {
                 DURATION_INTRO)    echo "각 화면이 표시될 시간을 초 단위로 입력하세요." ;;
                 DURATION_DEFAULT)  echo "Enter 키를 누르면 현재 기본값이 그대로 유지됩니다." ;;
                 DUR_LOGO)          echo "시작 로고 표시 시간 (현재 기본값: ${2}초): " ;;
-                DUR_OTHER)         echo "모든 화면 전환 시간 (현재 기본값: ${2}초): " ;;
+                DUR_OTHER)         echo "정보 화면 전환 시간 (현재 기본값: ${2}초): " ;;
+                TZ_PROMPT)         echo "시간대를 입력하세요 (예: Asia/Seoul, America/New_York): " ;;
+                TZ_INVALID)        echo "유효하지 않은 시간대입니다. 다시 시도해주세요." ;;
+                TZ_VALID)          echo "✔ 시간대 설정: $2" ;;
                 DUR_VALID)         echo "✔ $2 시간: ${3}초" ;;
                 INVALID_NUM)       echo "양의 정수를 입력해주세요." ;;
                 CONFIG_GENERATED)  echo "✔ config.ini 생성 완료." ;;
@@ -147,7 +153,10 @@ T() {
                 DURATION_INTRO)    echo "Ingrese el tiempo en segundos que se mostrará cada pantalla." ;;
                 DURATION_DEFAULT)  echo "Presione Enter para mantener el valor predeterminado actual." ;;
                 DUR_LOGO)          echo "Logotipo de Umbrel al inicio (predeterminado actual: ${2}s): " ;;
-                DUR_OTHER)         echo "Duración de todas las pantallas (predeterminado actual: ${2}s): " ;;
+                DUR_OTHER)         echo "Duración de pantalla de información (predeterminado actual: ${2}s): " ;;
+                TZ_PROMPT)         echo "Ingrese zona horaria (ej. America/New_York, Europe/Madrid): " ;;
+                TZ_INVALID)        echo "Zona horaria inválida. Por favor, inténtelo de nuevo." ;;
+                TZ_VALID)          echo "✔ Zona horaria establecida en: $2" ;;
                 DUR_VALID)         echo "✔ Duración de $2: ${3}s" ;;
                 INVALID_NUM)       echo "Por favor, ingrese un entero positivo." ;;
                 CONFIG_GENERATED)  echo "✔ config.ini generado exitosamente." ;;
@@ -183,7 +192,10 @@ T() {
                 DURATION_INTRO)    echo "各画面が表示される時間を秒単位で入力してください。" ;;
                 DURATION_DEFAULT)  echo "現在のデフォルト値を維持するにはEnterキーを押してください。" ;;
                 DUR_LOGO)          echo "起動時のUmbrelロゴ（現在のデフォルト：${2}秒）：" ;;
-                DUR_OTHER)         echo "全画面の表示時間（現在のデフォルト：${2}秒）：" ;;
+                DUR_OTHER)         echo "情報画面切替時間（現在のデフォルト：${2}秒）：" ;;
+                TZ_PROMPT)         echo "タイムゾーンを入力してください（例: Asia/Tokyo, America/New_York）：" ;;
+                TZ_INVALID)        echo "無効なタイムゾーンです。もう一度お試しください。" ;;
+                TZ_VALID)          echo "✔ タイムゾーンを $2 に設定しました。" ;;
                 DUR_VALID)         echo "✔ $2 の表示時間：${3}秒" ;;
                 INVALID_NUM)       echo "正の整数を入力してください。" ;;
                 CONFIG_GENERATED)  echo "✔ config.ini が正常に生成されました。" ;;
@@ -219,7 +231,10 @@ T() {
                 DURATION_INTRO)    echo "请输入每个屏幕显示的秒数。" ;;
                 DURATION_DEFAULT)  echo "按 Enter 键以保留当前默认值。" ;;
                 DUR_LOGO)          echo "启动时的 Umbrel 徽标（当前默认值：${2}秒）：" ;;
-                DUR_OTHER)         echo "所有屏幕持续时间（当前默认值：${2}秒）：" ;;
+                DUR_OTHER)         echo "信息屏幕切换时间（当前默认值：${2}秒）：" ;;
+                TZ_PROMPT)         echo "请输入时区（例如: Asia/Shanghai, America/New_York）：" ;;
+                TZ_INVALID)        echo "无效的时区。请重试。" ;;
+                TZ_VALID)          echo "✔ 时区已设置为：$2" ;;
                 DUR_VALID)         echo "✔ $2 持续时间：${3}秒" ;;
                 INVALID_NUM)       echo "请输入一个正整数。" ;;
                 CONFIG_GENERATED)  echo "✔ config.ini 已成功生成。" ;;
@@ -313,9 +328,32 @@ echo "$(T SCREENS_SELECTED) ${userScreenChoices}"
 echo
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Timezone Selection
+# ──────────────────────────────────────────────────────────────────────────────
+echo "--- [ 2/4 ] Timezone ---"
+echo
+
+DEFAULT_TZ=$(read_config_value "timezone" "UTC")
+
+gettingTimezone=true
+while $gettingTimezone; do
+    read -rp "$(T TZ_PROMPT)" newTimezone
+    newTimezone="${newTimezone:-$DEFAULT_TZ}"
+    # Validate using Python's pytz
+    tzValid=$(python3 -c "import pytz; pytz.timezone('${newTimezone}'); print('Valid')" 2>/dev/null || echo "Invalid")
+    if [ "$tzValid" = "Valid" ]; then
+        echo -e "  \e[1;32m$(T TZ_VALID "$newTimezone")\e[0m"
+        gettingTimezone=false
+    else
+        echo -e "  \e[1;31m$(T TZ_INVALID)\e[0m"
+    fi
+done
+echo
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Currency Selection
 # ──────────────────────────────────────────────────────────────────────────────
-echo "--- [ 2/3 ] Currency ---"
+echo "--- [ 3/4 ] Currency ---"
 echo
 
 gettingCurrency=true
@@ -335,7 +373,7 @@ echo
 # ──────────────────────────────────────────────────────────────────────────────
 # Duration Setup  (logo + all screens — no separate bitcoin price duration)
 # ──────────────────────────────────────────────────────────────────────────────
-echo "--- [ 3/3 ] $(T DURATION_HEADER) ---"
+echo "--- [ 4/4 ] $(T DURATION_HEADER) ---"
 echo
 echo "$(T DURATION_INTRO)"
 echo "$(T DURATION_DEFAULT)"
@@ -374,7 +412,7 @@ cat > "${cwd}/config.ini" << CONFIGEOF
 
 [USER]
 language = ${LANG_CODE,,}
-timezone = UTC
+timezone = ${newTimezone}
 currency = ${newCurrency}
 screens = ${userScreenChoices//Screen/}
 temp_unit = C
