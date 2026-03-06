@@ -107,7 +107,7 @@ ask_screen() {
     local desc="${SCREEN_DESCS[$num]}"
     local gettingChoice=true
     while $gettingChoice; do
-        read -rp "  Display Screen ${num} (${desc})? [yes/no]: " ans
+        read -rp "  Display Screen ${num} (${desc})? [y/n]: " ans
         ans_upper="${ans^^}"
         if [ "$ans_upper" = "YES" ] || [ "$ans_upper" = "Y" ]; then
             echo -e "  \e[1;32m✔ Screen ${num} added.\e[0m"
