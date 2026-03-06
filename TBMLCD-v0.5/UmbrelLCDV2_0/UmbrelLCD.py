@@ -1,7 +1,7 @@
 
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.25.0 (Umbrel 1.x compatible fork)
+#   Version  : 2.26.0 (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
 #    # v2.24.0: Screen transition default changed to 3s. Screen2 bottom numbers right-aligned.
@@ -340,6 +340,7 @@ BITCOIN_CONTAINER_NAMES = [n for n in BITCOIN_CONTAINER_NAMES if n]  # remove em
 # LND container names to try in order
 LND_CONTAINER_NAMES = [
     _cfg.get('LIGHTNING', 'container', fallback=''),  # user override
+    "lightning_app_1",      # Umbrel 1.x confirmed (Bitcoin Lightning Node app)
     "lightning_lnd_1",      # Umbrel 0.x
     "lightning-lnd-1",     # Umbrel 1.x alternative
     "app_lnd_1",            # Umbrel 1.x app store style
@@ -859,12 +860,11 @@ def display_price_text(currency):
         draw_left_justified_text(screen_buffer, sat_val, sat_x, 36, 270, sat_font2)
 
         # SATS/USD + temperature on the SAME line: combine into one string
-        # This guarantees perfect alignment - single draw call, single x position
+        # Font size matches currency label (12px). Placed at very bottom of screen (x=2).
         temperature = get_temperature()
         sats_msg = "SATS / " + currency + "   " + temperature + " "
-        bottom_label_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 14)
-        bottom_x = get_inverted_x(111, 14)
-        draw_left_justified_text(screen_buffer, sats_msg, bottom_x, 47, 270, bottom_label_font)
+        bottom_label_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 12)
+        draw_left_justified_text(screen_buffer, sats_msg, 2, 47, 270, bottom_label_font)
     except Exception as e:
         print("Error creating price text;", str(e))
 
@@ -985,15 +985,15 @@ def draw_screen4():
     month_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 22)
     day_font   = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 26)
     time_font  = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 30)
-    # Month Day at top (x=82)
+    # Month Day at top: shift up by 8px for better vertical balance
     draw_centered_text(screen_buffer, now.strftime('%B %d'),
-                       get_inverted_x(16, 22), 270, month_font)
-    # Day of week in middle (x=43)
+                       get_inverted_x(8, 22), 270, month_font)
+    # Day of week in middle
     draw_centered_text(screen_buffer, now.strftime('%A'),
-                       get_inverted_x(59, 26), 270, day_font)
-    # Time at bottom (x=15)
+                       get_inverted_x(51, 26), 270, day_font)
+    # Time at bottom
     draw_centered_text(screen_buffer, now.strftime('%-I:%M %p'),
-                       get_inverted_x(91, 30), 270, time_font)
+                       get_inverted_x(83, 30), 270, time_font)
 
 
 def draw_screen5():
@@ -1013,49 +1013,41 @@ def draw_screen5():
     #   Row 2 (x=48~64, 17px): Blockchain (top) + Hashrate (bottom)
     #   y=0~79 (upper half), y=80~159 (lower half)
 
+    # Layout: network.png has labels at x=86~94 (Connections/Mempool) and x=24~47 (Hashrate/Blockchain)
+    # Data values are placed BELOW the labels (smaller x = higher on screen in rot270 system)
+    # x=55~72: data row for top section (below Connections/Mempool labels at x=86~94)
+    # x=8~22:  data row for bottom section (below Hashrate/Blockchain labels at x=24~47)
+    # Original design: value + unit on SAME line (e.g. "10 Peers", "8 MB")
+    data_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 16)
+
+    # Connections (top-right quadrant, x=55): value + "Peers" on same line
     conn = get_connection_count()
     conn_str = str(conn) if conn is not False else "--"
-    n = len(conn_str)
-    conn_y = 23 if n == 2 else (27 if n == 1 else 19)
-    conn_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 15)
-    draw_left_justified_text(screen_buffer, conn_str, 68, conn_y, 270, conn_font)
+    draw_left_justified_text(screen_buffer, conn_str + " Peers", 55, 20, 270, data_font)
 
+    # Mempool (bottom-right quadrant, x=55): value + unit on same line
     mem = get_mempool_info()
     if mem and isinstance(mem, str) and len(mem.split()) >= 2:
         mem_val, mem_unit = mem.split()[0], mem.split()[1]
     else:
-        mem_val, mem_unit = "--", "TX"
-    n = len(mem_val)
-    mem_y = 101 if n == 2 else (108 if n == 1 else 98)
-    mem_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 15)
-    draw_left_justified_text(screen_buffer, mem_val, 68, mem_y, 270, mem_font)
-    unit_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 9)
-    draw_left_justified_text(screen_buffer, mem_unit, 55, 105, 270, unit_font)
-    draw_left_justified_text(screen_buffer, "Peers", 55, 22, 270, unit_font)
+        mem_val, mem_unit = "--", "MB"
+    draw_left_justified_text(screen_buffer, mem_val + " " + mem_unit, 55, 98, 270, data_font)
 
+    # Hashrate (bottom-left quadrant, x=8): value + unit on same line
     hr = get_network_hash_ps()
     if hr and isinstance(hr, str) and len(hr.split()) >= 2:
         hr_val, hr_unit = hr.split()[0], hr.split()[1]
     else:
         hr_val, hr_unit = "--", "EH/s"
-    n = len(hr_val)
-    hr_y = 23 if n == 2 else (27 if n == 1 else 19)
-    hr_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 15)
-    draw_left_justified_text(screen_buffer, hr_val, 22, hr_y, 270, hr_font)
-    hr_unit_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 9)
-    draw_left_justified_text(screen_buffer, hr_unit, 8, 22, 270, hr_unit_font)
+    draw_left_justified_text(screen_buffer, hr_val + " " + hr_unit, 8, 20, 270, data_font)
 
+    # Blockchain size (top-left quadrant, x=8): value + unit on same line
     bs = get_blockchain_size()
     if bs and isinstance(bs, str) and len(bs.split()) >= 2:
         bs_val, bs_unit = bs.split()[0], bs.split()[1]
     else:
         bs_val, bs_unit = "--", "GB"
-    n = len(bs_val)
-    bs_y = 101 if n == 2 else (108 if n == 1 else 98)
-    bs_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 15)
-    draw_left_justified_text(screen_buffer, bs_val, 22, bs_y, 270, bs_font)
-    bs_unit_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 9)
-    draw_left_justified_text(screen_buffer, bs_unit, 8, 105, 270, bs_unit_font)
+    draw_left_justified_text(screen_buffer, bs_val + " " + bs_unit, 8, 98, 270, data_font)
 
 
 def draw_screen6():
@@ -1137,7 +1129,7 @@ def draw_screen7():
     # "Used out of X" with a space before disk_capacity for readability
     draw_left_justified_text(screen_buffer, "Used out of " + disk_capacity, 43, 7, 270,
                              ImageFont.truetype(poppins_fonts_path + "Poppins-Regular.ttf", 10))
-    # Available space: right-aligned
+    # Available space: right-aligned (space already included in classify_kilo_bytes output)
     draw_right_justified_text(screen_buffer, available_space + " available", 13, 11, 270,
                               ImageFont.truetype(poppins_fonts_path + "Poppins-Regular.ttf", 10))
     # Progress bar
@@ -1151,7 +1143,7 @@ def draw_screen7():
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
-print('Running Umbrel LCD script - Version: 2.25.0 (Umbrel 1.x compatible)')
+print('Running Umbrel LCD script - Version: 2.26.0 (Umbrel 1.x compatible)')
 
 # Display umbrel logo on startup (duration configurable in config.ini)
 display_background_image('umbrel_logo.png')
