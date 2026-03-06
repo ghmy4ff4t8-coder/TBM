@@ -95,19 +95,19 @@ That's it! Your LCD should now be running.
 
 *   **Check Logs:**
     ```bash
-    sudo journalctl -u tbm -f
+    sudo journalctl -u tbm-umbrel -f
     ```
 *   **Restart Service:**
     ```bash
-    sudo systemctl restart tbm
+    sudo systemctl restart tbm-umbrel
     ```
 *   **Stop Service:**
     ```bash
-    sudo systemctl stop tbm
+    sudo systemctl stop tbm-umbrel
     ```
 *   **Re-run Setup Wizard:**
     ```bash
-    sudo systemctl stop tbm && bash ~/TBM/app/configure.sh
+    sudo systemctl stop tbm-umbrel && bash ~/TBM/app/configure.sh
     ```
 
 ## Updating
@@ -117,7 +117,7 @@ cd ~/TBM
 git stash
 git pull
 git stash drop
-sudo systemctl restart tbm
+sudo systemctl restart tbm-umbrel
 ```
 
 ## Uninstallation
@@ -144,7 +144,7 @@ bash uninstall.sh
 
 ## Troubleshooting
 
-*   **White Screen:** Check your GPIO wiring. Also verify the service is running with `sudo systemctl status tbm`.
+*   **White Screen:** Check your GPIO wiring. Also verify the service is running with `sudo systemctl status tbm-umbrel`.
 *   **Garbled/Stripey Display:** This fork includes a bundled ST7735 driver (`st7735_tbm.py`) tuned for the TBM 1.8" panel. If issues persist, it may be a hardware problem.
 *   **`config.ini` Conflicts on `git pull`:** Use `git stash` before pulling (see Updating section above).
 

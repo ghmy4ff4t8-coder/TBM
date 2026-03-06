@@ -27,9 +27,9 @@ echo
 STATUS="$(systemctl is-active tbm.service)"
 if [ "${STATUS}" = "active" ]; then
     echo "Uninstalling tbm.service"
-    sudo systemctl stop tbm.service
-    sudo systemctl disable tbm.service
-    sudo rm /lib/systemd/system/tbm.service
+    sudo systemctl stop tbm-umbrel.service
+    sudo systemctl disable tbm-umbrel.service
+    sudo rm /lib/systemd/system/tbm-umbrel.service
     sudo systemctl daemon-reload
 else 
     echo "tbm.service not running."   
