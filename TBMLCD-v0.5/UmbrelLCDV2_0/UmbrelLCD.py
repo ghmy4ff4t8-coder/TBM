@@ -1,7 +1,7 @@
 
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.30.0 (Umbrel 1.x compatible fork)
+#   Version  : 2.31.0 (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
 #    # v2.24.0: Screen transition default changed to 3s. Screen2 bottom numbers right-aligned.
@@ -264,6 +264,28 @@ disp = ST7735(
 def lcd_display(image):
     """Send a PIL Image to the LCD via the bundled st7735_tbm driver."""
     disp.display(image)
+
+
+# Previous frame buffer for dissolve effect
+_prev_buffer = None
+
+def lcd_display_dissolve(image, steps=6):
+    """Display image with a dissolve (cross-fade) transition from the previous frame.
+    steps: number of blend frames (6 = ~0.3s on RPi at typical SPI speed).
+    """
+    global _prev_buffer
+    if _prev_buffer is None:
+        # First call: no previous frame, just display directly
+        disp.display(image)
+        _prev_buffer = image.copy()
+        return
+    prev = _prev_buffer.convert('RGBA')
+    curr = image.convert('RGBA')
+    for i in range(1, steps + 1):
+        alpha = int(255 * i / steps)
+        blended = Image.blend(prev, curr, alpha / 255.0).convert('RGB')
+        disp.display(blended)
+    _prev_buffer = image.copy()
 
 # ---------------------------------------------------------------------------
 # Off-screen image buffer.
@@ -1157,12 +1179,14 @@ def draw_screen7():
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
-print('Running Umbrel LCD script - Version: 2.30.0 (Umbrel 1.x compatible)')
+print('Running Umbrel LCD script - Version: 2.31.0 (Umbrel 1.x compatible)')
 
 # Display umbrel logo on startup (duration configurable in config.ini)
 display_background_image('umbrel_logo.png')
 lcd_display(screen_buffer)
 time.sleep(LOGO_DURATION)
+# Prime the dissolve buffer with the logo frame
+_prev_buffer = screen_buffer.copy()
 
 tor_status = get_tor_status()
 mempool_status = check_umbrel_and_mempool()
@@ -1176,7 +1200,7 @@ while True:
         print(f"current_mempool_url = {mempool_url}")
         if "Screen1" in userScreenChoices:
             draw_screen1(currency)
-            lcd_display(screen_buffer)
+            lcd_display_dissolve(screen_buffer)
             time.sleep(SCREEN1_DURATION)
     except Exception as e:
         print("Error showing screen1;", str(e))
@@ -1184,7 +1208,7 @@ while True:
     try:
         if "Screen2" in userScreenChoices:
             draw_screen2()
-            lcd_display(screen_buffer)
+            lcd_display_dissolve(screen_buffer)
             time.sleep(SCREEN_DURATION)
     except Exception as e:
         print("Error showing screen2;", str(e))
@@ -1192,7 +1216,7 @@ while True:
     try:
         if "Screen3" in userScreenChoices:
             draw_screen3()
-            lcd_display(screen_buffer)
+            lcd_display_dissolve(screen_buffer)
             time.sleep(SCREEN_DURATION)
     except Exception as e:
         print("Error showing screen3;", str(e))
@@ -1200,7 +1224,7 @@ while True:
     try:
         if "Screen4" in userScreenChoices:
             draw_screen4()
-            lcd_display(screen_buffer)
+            lcd_display_dissolve(screen_buffer)
             time.sleep(SCREEN_DURATION)
     except Exception as e:
         print("Error showing screen4;", str(e))
@@ -1208,7 +1232,7 @@ while True:
     try:
         if "Screen5" in userScreenChoices:
             draw_screen5()
-            lcd_display(screen_buffer)
+            lcd_display_dissolve(screen_buffer)
             time.sleep(SCREEN_DURATION)
     except Exception as e:
         print("Error showing screen5;", str(e))
@@ -1216,7 +1240,7 @@ while True:
     try:
         if "Screen6" in userScreenChoices:
             draw_screen6()
-            lcd_display(screen_buffer)
+            lcd_display_dissolve(screen_buffer)
             time.sleep(SCREEN_DURATION)
     except Exception as e:
         print("Error showing screen6;", str(e))
@@ -1224,7 +1248,7 @@ while True:
     try:
         if "Screen7" in userScreenChoices:
             draw_screen7()
-            lcd_display(screen_buffer)
+            lcd_display_dissolve(screen_buffer)
             time.sleep(SCREEN_DURATION)
     except Exception as e:
         print("Error showing screen7;", str(e))
