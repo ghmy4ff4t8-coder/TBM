@@ -1,8 +1,14 @@
-Whats New in version 0.5
-========================
-+ A newer version of ST7735 library
-+ All API requests through Tor
-+ Mempool infö from your node if mempool app is installed
-+ Bitcoin network information screen
-+ Payment channels information screen
-+ Disk storage information screen
+v2.32.0 (2024-03-07)
+- Screen1: Widened the gap between SATS/USD and temperature to 8 spaces for better readability.
+- Config: Increased default dissolve steps to 8 for a smoother transition effect.
+
+v2.31.0 (2024-03-05)
+- Umbrel 1.x Compatibility: Major overhaul to support changes in Umbrel OS 1.x.
+  - Added fallback logic to find correct Docker container names (e.g., `bitcoin_bitcoind_1`, `lnd_lnd_1`).
+  - Implemented direct HTTP RPC calls to `bitcoind` and `lncli` as a more robust alternative to `docker exec`.
+- Pillow 10+ Compatibility: Replaced the deprecated `draw.textsize()` with a backward-compatible function using `draw.textbbox()`.
+- Systemd Service: Explicitly added `/usr/local/bin` to the `PATH` in the service file to ensure Docker commands are found.
+- Installation Script: Added `--break-system-packages` flag to `pip` commands to comply with Python 3.11+ system package protection.
+
+v0.5 (Original Release by DoidoTech)
+- Initial release of The Bitcoin Machine LCD script for Umbrel.

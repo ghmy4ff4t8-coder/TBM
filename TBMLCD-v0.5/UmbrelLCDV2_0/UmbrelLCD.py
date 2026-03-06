@@ -4,164 +4,42 @@
 #   Version  : 2.32.0 (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
-#    # v2.24.0: Screen transition default changed to 3s. Screen2 bottom numbers right-aligned.
-#           Screen3 block height number moved lower (x=8). Screen4 order changed to
-#           Date/Day/Time with Asia/Seoul timezone default (pytz). Screen5 additional
-#           Umbrel 1.x container names added. Storage: integer TB (no .0), space before unit.
-#    # v2.22.0: Screen1 icon gap adjusted to 15px (middle value). SATS/USD and temperature
-    #           combined into single string for guaranteed same-line alignment.
-    #           Temperature now reads from /sys/class/thermal/thermal_zone0/temp (Umbrel/RPi).
-    # v2.21.0: Screen1 layout precision improvements.
-#           BTC price number x aligned to icon center (ideal_x 79→74).
-#           SAT number x aligned to icon center (ideal_x 24→21).
-#           Temperature placed exactly on same line as SATS/USD label
-#           using measured text width (y=122, gap=6px after SATS/USD end).
-#           Both numbers now vertically centered with their icons.
-#    # v2.20.0: Calibrated all screen coordinates to match original doidotech/TBM v2.0.1.
-#           Screen1: Restored original font formula int(195/n) for BTC price,
-#                    int(200/n) for SAT value, icon size 27px (was 36px),
-#                    icon positions BTC(80,2) SAT(27,2), y=30 (was y=40).
-#                    Currency label 12px right-justified, SATS/USD 14px left-justified.
-#           Screen2: Restored original font_constant=86 for fee boxes, y=9 (low)
-#                    and y=88 (high), font_constant=112 for next block TXs,
-#                    font_constant=120 for unconfirmed TXs.
-#           Screen3: Restored original hard_font_size=40, x=get_inverted_x(72,40)=16.
-#           Simulator: Updated simulate_screens.py to match all above changes.
-#    # v2.19.0: Fixed layout issues found in hardware testing.
-#           Screen1: Fixed BTC price number being clipped (y overflow). Reduced font
-#                    sizing formula to fit 120px available width. Icons repositioned.
-#           Screen2: Fixed fee boxes showing only 1 number (both were centered at
-#                    same y position). Now each box has its own y coordinate.
-#           Screen7: Improved 'Used out of' text spacing, switched to Poppins-Regular.
-#    # v2.18.0: Layout improvements to match original thebitcoinmachines.com LCD faces.
-#           Screen1: Increased BTC price and SAT font sizes (removed 32px cap, now 48px max).
-#                    Icons repositioned to match original design.
-#           Screen2: Fee box numbers larger and centered; TX counts use dynamic sizing.
-#           Screen3: Block height font size increased (18->24px).
-#    # v2.17.0: Fixed text 180-degree inversion: all draw_*_text angle changed
-#           from 90 to 270. Background images and icons use rotate(270) and
-#           display correctly; text was rendered with rotate(90) which is
-#           180 degrees opposite, causing all text to appear upside-down and
-#           left-right mirrored. rotate(270) matches the background orientation.
-#    # v2.16.0: Fixed horizontal text mirroring: MADCTL changed from 0x40 (MX=1)
-#           to 0x00 (MX=0) in st7735_tbm.py. MX=1 caused all text to appear
-#           left-right flipped on hardware. rotate(270 CCW) + MX=0 is the
-#           correct combination for portrait orientation without LR flip.
-#           Fixed draw_screen5 (Network screen) crash: get_connection_count(),
-#           get_mempool_info(), get_network_hash_ps(), get_blockchain_size()
-#           return False on error; added isinstance checks before .split()
-#           to prevent 'bool object has no attribute split' exception.
-#    # v2.15.0: Changed display_background_image() from rotate(90) to rotate(270).
-#           Background PNG files are designed for rotate(270) orientation.
-#           All screen text coordinates recalibrated for rotate(270) coordinate system.
-#           Screens updated: Bitcoin Price, Block Height, Transactions,
-#           Network, Payment Channels, Storage, Date/Time.
-#    # v2.14.6: Changed flip in image_to_data() from column flip ([:, ::-1, :])
-#           to row flip ([::-1, :, :]). After rotate(90 CCW), buffer rows =
-#           original columns, so row flip corrects the LR mirror correctly.
-#    # v2.14.5: Added horizontal flip (pb[:, ::-1, :]) in image_to_data() - wrong axis.
-#           rotate(90 CCW) + MADCTL=0x40 produces correct upright image
-#           but left-right mirrored. The flip corrects the LR mirror.
-#           All three axes now confirmed correct on hardware.
-#    # v2.14.4: Changed all rotate(270) → rotate(90) in UmbrelLCD.py.
-#           MADCTL=0x40 is confirmed correct. The upside-down was caused by
-#           rotate(270 CCW) producing the wrong orientation with MX=1.
-#           rotate(90 CCW) = 270 CW is the correct direction.
-#    # v2.14.3: Reverted MADCTL back to 0x40 (MY=0, MX=1, BGR).
-#           Root cause of persisting upside-down in v2.14.1 was stale .pyc
-#           cache on the device running the old 0xC0 code. MY=1 made it worse.
-#           0x40 = rotate(270 CCW) + MX=1 is the confirmed correct combination.
-#    # v2.14.2: MADCTL 0x40 → 0xC0 (added MY=1 bit) - incorrect, reverted.
-#    # v2.14.1: Reverted MADCTL to 0x40 (MX=1, BGR) + no flip in image_to_data().
-#           This is the v2.10.0 combination confirmed working on hardware.
-#           All subsequent orientation attempts (0xC0, 0x00 + flip) were wrong.
-#    # v2.14.0: Code cleanup: removed unused imports (numpy, certifi, ssl, urlreq,
-#           socket), merged duplicate config reader (load_config → _cfg),
-#           removed unused get_text_size(), cleaned up st7735_tbm.py
-#           (batched data() calls, removed duplicate register constants,
-#           clarified orientation pipeline in comments).
-#    # v2.13.1: Changed image_to_data() flip from 180° (pb[::-1,::-1,:]) to
-#           vertical-only flip (pb[::-1,:,:]) to test upside-down correction only.
-#    # v2.13.0: Fixed display orientation (upside-down + left-right mirror)
-#           Root cause: software 270° rotation + MADCTL=0x00 (direct map)
-#           produces 180°-wrong output. Fix: added 180° flip in image_to_data()
-#           in st7735_tbm.py (pb[::-1, ::-1, :]) before RGB565 conversion.
-#           Net effect: 270° SW rotation + 180° HW flip = 90° correct portrait.
-#           Fixed text clipping: replaced draw.textbbox size calculation with
-#           make_text_image() that accounts for font descent/ascent offsets.
-#           Fixed setup script language selection (eval bug → case/if approach).
-#           Duration prompts now read actual defaults from config.ini.
-#    # v2.12.0: MADCTL 0xC0→0x00 (MY=0,MX=0,BGR) 화면 방향 수정 (상하+좌우 반전 해제)
-#           모든 화면 기본 전환 시간 10초로 변경, 설치 스크립트 다국어 지원 추가
-# v2.11.0: MADCTL 0x48→0xC0 (MY=1 추가) 상하반전 재수정, 설치 스크립트에서 화면 전환 시간 인터랙티브 설정 추가, 기본값 6초
-# v2.10.0:2024-03):
-#       - FIXED: LCD left-right mirror - MADCTL 0x08 → 0x48 (added MX=1 bit)
-#         Photos showed text was horizontally mirrored (e.g. "USD" → "uen")
-#       - FIXED: Colour inversion - bgr=True added to ST7735 init
-#         Bitcoin icon was blue instead of orange (RGB/BGR byte order swap)
-#       - ADDED: Screen display durations configurable via config.ini [DISPLAY]
-#         logo_duration, screen1_duration, screen_duration (default: 60/60/30s)
+#    v2.32.0 (2024-03-07)
+#    - Screen1: Widened the gap between SATS/USD and temperature to 8 spaces for better readability.
+#    - Config: Increased default dissolve steps to 8 for a smoother transition effect.
 #
-#     v2.9.0 (2024-03):
-#       - FIXED: LCD 180-degree rotation - MADCTL changed from 0xC8 (MY=1,MX=1)
-#         to 0x08 (MY=0,MX=0). Photos confirmed image was upside-down+mirrored.
-#       - IMPROVED: Data layer resilience against Umbrel updates:
-#         * RPC credentials (user/pass/host/port) now read from config.ini,
-#           so future Umbrel credential changes only need config.ini edit.
-#         * Container names read from config.ini with hardcoded fallback list.
-#         * get_block_count: local RPC → mempool.space → blockchain.info
-#         * get_btc_price: CoinGecko → Coinbase → Kraken (3 independent APIs)
-#         * mempool data: local Umbrel mempool → public mempool.space
-#         * Removed Tor dependency from price/block APIs (direct HTTPS instead)
-#
-#     v2.8.0 (2024-03):
-#       - FIXED: gpiod 2.x API compatibility in st7735_tbm.py.
-#         gpiod 2.0 removed the entire 1.x API (get_line, LINE_REQ_DIR_OUT).
-#         Updated to use chip.request_lines() with LineSettings(direction=OUTPUT)
-#         and gpiod.line.Value.ACTIVE/INACTIVE enum values.
-#       - FIXED: lcdSetupScript.sh apt package names (spidev→python3-spidev,
-#         removed non-existent python3-gpiod apt package).
-#
-#     v2.7.0 (2024-03):
-#       - FIXED: Root cause of all stripe/noise issues identified and resolved.
-#         Replaced pimoroni/st7735-python with bundled st7735_tbm.py driver.
-#
-#         Root cause: pimoroni library defines ST7735_COLS=132, ST7735_ROWS=162
-#         (for their own 0.96" display), giving offset_left=2, offset_top=1.
-#         The TBM 1.8" panel uses ST7735_COLS=128, ST7735_ROWS=160, so
-#         offset_left=0, offset_top=0. The 2-pixel column offset caused the
-#         CASET window to be misaligned, producing the diagonal stripe pattern.
-#
-#         st7735_tbm.py is a direct port of doido-technologies/st7735-python
-#         (v0.0.4.doidotech) with RPi.GPIO replaced by gpiod + spidev.
-#         It uses the correct MADCTL=0xC8 and offset_left=0, offset_top=0.
-#
-#     v2.6.0 (2024-03):
-#       - FIXED: Stripe noise by bypassing pimoroni's display() entirely.
-#         New lcd_display() function converts PIL image to RGB565 bytes
-#         directly (no numpy rot90) and calls disp.set_window() + disp.data()
-#         directly. This eliminates all stride/shape mismatch issues.
-#
-#     v2.5.0 (2024-03):
-#       - FIXED: Diagonal stripe / sline noise caused by SPI stride mismatch.
-#
-#         Root cause analysis:
-#         pimoroni/st7735-python v1.0.0 image_to_data() does:
-#           pb = np.rot90(np.array(image.convert('RGB')), rotation // 90)
-#         The PIL image buffer is shape (HEIGHT, WIDTH, 3) = (160, 128, 3).
-#
-#         With rotation=0: np.rot90(arr, 0) → shape stays (160, 128, 3).
-#         The flattened byte stream is then written to the ST7735 starting at
-#         CASET x0=2..129 (128 cols) and RASET y0=1..160 (160 rows).
-#         But the numpy array has 160 'rows' of 128 pixels each — the library
-#         iterates row-major, so it sends 160 rows × 128 pixels. This matches
-#         the RASET window (160 rows) perfectly only if the LCD scans top-to-
-#         bottom in portrait. However the MADCTL byte 0xC0 sets MX=1, MY=1
-#         which means the ST7735 scans in landscape (row = physical column).
-#         Result: every row of pixel data is written across a physical column
-#         → diagonal stripe pattern.
-#
-#         With rotation=90: np.rot90(arr, 1) → shape becomes (128, 160, 3).
+#    v2.31.0 (2024-03-05)
+#    - Umbrel 1.x Compatibility: Major overhaul to support changes in Umbrel OS 1.x.
+#      - Added fallback logic to find correct Docker container names (e.g., `bitcoin_bitcoind_1`, `lnd_lnd_1`).
+#      - Implemented direct HTTP RPC calls to `bitcoind` and `lncli` as a more robust alternative to `docker exec`.
+#    - Pillow 10+ Compatibility: Replaced the deprecated `draw.textsize()` with a backward-compatible function using `draw.textbbox()`.
+#    - Systemd Service: Explicitly added `/usr/local/bin` to the `PATH` in the service file to ensure Docker commands are found.
+#    - Installation Script: Added `--break-system-packages` flag to `pip` commands to comply with Python 3.11+ system package protection.
+#    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+160, 3).
 #         Now the byte stream has 128 'rows' of 160 pixels, matching the
 #         landscape MADCTL scan direction. The image appears correctly oriented.
 #
