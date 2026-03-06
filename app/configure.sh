@@ -80,13 +80,43 @@ echo
 echo " This script will guide you through setting up the LCD service."
 echo " Please answer with yes or no, then press Enter."
 echo
-echo " Timezone auto-detected: ${DETECTED_TZ}"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Timezone Confirmation
+# ──────────────────────────────────────────────────────────────────────────────
+echo "--- [ 1/4 ] Timezone ---"
+echo
+echo "  Auto-detected timezone: ${DETECTED_TZ}"
+echo
+
+FINAL_TZ="${DETECTED_TZ}"
+read -rp "  Is this correct? [y/n]: " tz_ans
+tz_ans_upper="${tz_ans^^}"
+if [ "$tz_ans_upper" = "NO" ] || [ "$tz_ans_upper" = "N" ]; then
+    echo
+    echo "  Enter your timezone in IANA format."
+    echo "  Examples: Asia/Seoul, America/New_York, Europe/London, Asia/Tokyo"
+    echo "  Full list: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones"
+    echo
+    while true; do
+        read -rp "  Timezone: " new_tz
+        if python3 -c "import pytz; pytz.timezone(\"${new_tz}\")" 2>/dev/null; then
+            FINAL_TZ="$new_tz"
+            echo -e "  \e[1;32m✔ Timezone set to: ${FINAL_TZ}\e[0m"
+            break
+        else
+            echo -e "  \e[1;31mInvalid timezone. Please check the spelling and try again.\e[0m"
+        fi
+    done
+else
+    echo -e "  \e[1;32m✔ Timezone confirmed: ${FINAL_TZ}\e[0m"
+fi
 echo
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Screen Selection
 # ──────────────────────────────────────────────────────────────────────────────
-echo "--- [ 1/3 ] Screen Selection ---"
+echo "--- [ 2/4 ] Screen Selection ---"
 echo
 
 userScreenChoices=""
@@ -133,7 +163,7 @@ echo
 # ──────────────────────────────────────────────────────────────────────────────
 # Currency Selection
 # ──────────────────────────────────────────────────────────────────────────────
-echo "--- [ 2/3 ] Currency ---"
+echo "--- [ 3/4 ] Currency ---"
 echo
 echo "  Supported currencies:"
 echo "  AED  ARS  AUD  BDT  BHD  BMD  BRL  CAD  CHF  CLP"
@@ -160,7 +190,7 @@ echo
 # ──────────────────────────────────────────────────────────────────────────────
 # Duration Setup
 # ──────────────────────────────────────────────────────────────────────────────
-echo "--- [ 3/3 ] Screen Duration Setup ---"
+echo "--- [ 4/4 ] Screen Duration Setup ---"
 echo
 echo "  Enter the time in seconds each info screen is displayed."
 echo "  Press Enter to keep the current default."
@@ -201,7 +231,7 @@ cat > "${cwd}/config.ini" << CONFIGEOF
 [USER]
 # Your local timezone (auto-detected from system, IANA format).
 # Examples: UTC, Asia/Seoul, America/New_York, Europe/London
-timezone = ${DETECTED_TZ}
+timezone = ${FINAL_TZ}
 
 # Currency code for Bitcoin price display.
 # Examples: USD, EUR, KRW, JPY, GBP, AUD, CAD
