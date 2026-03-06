@@ -1,9 +1,15 @@
 
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.20.0 (Umbrel 1.x compatible fork)
+#   Version  : 2.21.0 (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
+#    # v2.21.0: Screen1 layout precision improvements.
+#           BTC price number x aligned to icon center (ideal_x 79→74).
+#           SAT number x aligned to icon center (ideal_x 24→21).
+#           Temperature placed exactly on same line as SATS/USD label
+#           using measured text width (y=122, gap=6px after SATS/USD end).
+#           Both numbers now vertically centered with their icons.
 #    # v2.20.0: Calibrated all screen coordinates to match original doidotech/TBM v2.0.1.
 #           Screen1: Restored original font formula int(195/n) for BTC price,
 #                    int(200/n) for SAT value, icon size 27px (was 36px),
@@ -817,45 +823,55 @@ def display_price_text(currency):
         # BTC price font size: original formula int(195/n)
         price_font_size = int(195 / n) if n > 0 else 12
         price_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", price_font_size)
-        # x position corrected for smaller fonts (original: ideal=39, ideal_x=79)
-        price_x = get_corrected_x_position(39, price_font_size, 79)
-        draw_left_justified_text(screen_buffer, newPrice, price_x, 30, 270, price_font)
+        # x: ideal_x=74 centers the number vertically with the BTC icon (center=93)
+        # get_corrected_x_position shifts x down for smaller fonts
+        price_x = get_corrected_x_position(39, price_font_size, 74)
+        draw_left_justified_text(screen_buffer, newPrice, price_x, 36, 270, price_font)
 
         # Currency label: 12px, right-justified
         cur_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 12)
         draw_right_justified_text(screen_buffer, currency, get_inverted_x(1, 12), 4, 270, cur_font)
 
-        # SAT value
+        # SAT value: same formula as BTC price but capped at price_font_size
         sat_val = str(int(100_000_000 / price)) if price else "0"
         n2 = len(sat_val)
-        sat_font_size = int(200 / n2) if n2 > 4 else 50
+        sat_font_size = min(int(195 / n2) if n2 > 0 else 12, price_font_size)
         sat_font2 = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", sat_font_size)
-        # x position corrected for smaller fonts (original: ideal=50, ideal_x=24)
-        sat_x = get_corrected_x_position(50, sat_font_size, 24)
-        draw_left_justified_text(screen_buffer, sat_val, sat_x, 30, 270, sat_font2)
+        # x: ideal_x=21 centers the number vertically with the SAT icon (center=40)
+        sat_x = get_corrected_x_position(39, sat_font_size, 21)
+        draw_left_justified_text(screen_buffer, sat_val, sat_x, 36, 270, sat_font2)
 
         # SATS/USD label: 14px, left-justified
         sats_msg = "SATS / " + currency
-        sat_label_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 14)
-        draw_left_justified_text(screen_buffer, sats_msg, get_inverted_x(111, 14), 39, 270, sat_label_font)
+        bottom_label_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 14)
+        bottom_x = get_inverted_x(111, 14)
+        draw_left_justified_text(screen_buffer, sats_msg, bottom_x, 39, 270, bottom_label_font)
     except Exception as e:
         print("Error creating price text;", str(e))
 
 
 def display_temperature():
+    temperature = "--'C"
     try:
-        r = subprocess.run(['vcgencmd', 'measure_temp'],
-                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-        if r.returncode == 0:
-            raw = r.stdout.decode().replace("temp=", "").replace("'C", "").strip()
-            temperature = str(int(float(raw))) + "'C"
-        else:
-            with open('/sys/class/thermal/thermal_zone0/temp') as f:
-                temperature = str(int(int(f.read().strip()) / 1000)) + "'C"
+        # Try /sys/class/thermal first (works on Raspberry Pi / Umbrel)
+        with open('/sys/class/thermal/thermal_zone0/temp') as f:
+            temperature = str(int(int(f.read().strip()) / 1000)) + "'C"
     except Exception:
-        temperature = "--'C"
-    temp_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 12)
-    draw_right_justified_text(screen_buffer, temperature, 3, 3, 270, temp_font)
+        try:
+            r = subprocess.run(['vcgencmd', 'measure_temp'],
+                               stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if r.returncode == 0:
+                raw = r.stdout.decode().replace("temp=", "").replace("'C", "").strip()
+                temperature = str(int(float(raw))) + "'C"
+        except Exception:
+            temperature = "--'C"
+    # Place temperature on the SAME x-row as SATS/USD label.
+    # SATS/USD uses draw_left_justified_text at x=bottom_x, y=39.
+    # Temperature is right-aligned on the same row: y=120 (right side of screen)
+    temp_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 14)
+    bottom_x = get_inverted_x(111, 14)
+    # y=122: SATS/USD starts at y=39, width=77px → ends at y=116; gap=6 → temp at y=122
+    draw_left_justified_text(screen_buffer, temperature, bottom_x, 122, 270, temp_font)
 
 
 def display_block_count_text():
