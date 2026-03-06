@@ -1,9 +1,17 @@
 
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.15.0 (Umbrel 1.x compatible fork)
+#   Version  : 2.16.0 (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
+#    # v2.16.0: Fixed horizontal text mirroring: MADCTL changed from 0x40 (MX=1)
+#           to 0x00 (MX=0) in st7735_tbm.py. MX=1 caused all text to appear
+#           left-right flipped on hardware. rotate(270 CCW) + MX=0 is the
+#           correct combination for portrait orientation without LR flip.
+#           Fixed draw_screen5 (Network screen) crash: get_connection_count(),
+#           get_mempool_info(), get_network_hash_ps(), get_blockchain_size()
+#           return False on error; added isinstance checks before .split()
+#           to prevent 'bool object has no attribute split' exception.
 #    # v2.15.0: Changed display_background_image() from rotate(90) to rotate(270).
 #           Background PNG files are designed for rotate(270) orientation.
 #           All screen text coordinates recalibrated for rotate(270) coordinate system.
@@ -912,13 +920,17 @@ def draw_screen5():
     #   y=0~79 (upper half), y=80~159 (lower half)
 
     conn = get_connection_count()
-    conn_str = str(conn)
+    conn_str = str(conn) if conn is not False else "--"
     n = len(conn_str)
     conn_y = 23 if n == 2 else (27 if n == 1 else 19)
     conn_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 15)
     draw_left_justified_text(screen_buffer, conn_str, 68, conn_y, 90, conn_font)
+
     mem = get_mempool_info()
-    mem_val, mem_unit = mem.split()[0], mem.split()[1]
+    if mem and isinstance(mem, str) and len(mem.split()) >= 2:
+        mem_val, mem_unit = mem.split()[0], mem.split()[1]
+    else:
+        mem_val, mem_unit = "--", "TX"
     n = len(mem_val)
     mem_y = 101 if n == 2 else (108 if n == 1 else 98)
     mem_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 15)
@@ -926,16 +938,24 @@ def draw_screen5():
     unit_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 9)
     draw_left_justified_text(screen_buffer, mem_unit, 55, 105, 90, unit_font)
     draw_left_justified_text(screen_buffer, "Peers", 55, 22, 90, unit_font)
+
     hr = get_network_hash_ps()
-    hr_val, hr_unit = hr.split()[0], hr.split()[1]
+    if hr and isinstance(hr, str) and len(hr.split()) >= 2:
+        hr_val, hr_unit = hr.split()[0], hr.split()[1]
+    else:
+        hr_val, hr_unit = "--", "EH/s"
     n = len(hr_val)
     hr_y = 23 if n == 2 else (27 if n == 1 else 19)
     hr_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 15)
     draw_left_justified_text(screen_buffer, hr_val, 22, hr_y, 90, hr_font)
     hr_unit_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 9)
     draw_left_justified_text(screen_buffer, hr_unit, 8, 22, 90, hr_unit_font)
+
     bs = get_blockchain_size()
-    bs_val, bs_unit = bs.split()[0], bs.split()[1]
+    if bs and isinstance(bs, str) and len(bs.split()) >= 2:
+        bs_val, bs_unit = bs.split()[0], bs.split()[1]
+    else:
+        bs_val, bs_unit = "--", "GB"
     n = len(bs_val)
     bs_y = 101 if n == 2 else (108 if n == 1 else 98)
     bs_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 15)
@@ -1033,7 +1053,7 @@ def draw_screen7():
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
-print('Running Umbrel LCD script - Version: 2.15.0 (Umbrel 1.x compatible)')
+print('Running Umbrel LCD script - Version: 2.16.0 (Umbrel 1.x compatible)')
 
 # Display umbrel logo on startup (duration configurable in config.ini)
 display_background_image('umbrel_logo.png')

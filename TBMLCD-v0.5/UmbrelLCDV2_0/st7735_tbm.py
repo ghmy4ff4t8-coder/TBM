@@ -197,19 +197,18 @@ class ST7735(object):
 
         self.command(ST7735_INVON if self._invert else ST7735_INVOFF)
 
-        # MADCTL: MY=0, MX=1, MV=0
-        # MX=1 (bit 6) = column address right-to-left
+        # MADCTL: MY=0, MX=0, MV=0
+        # MX=0 (bit 6) = column address left-to-right (no horizontal flip)
         # MY=0 (bit 7) = row address top-to-bottom (default)
         # BGR bit (bit 3): 0 = BGR order, 1 = RGB order
         #
         # With software rotate(270, expand=1) in UmbrelLCD.py:
-        #   rotate(270 CCW) + MX=1 = correct portrait orientation
-        #   (confirmed working combination from v2.10.0 hardware test)
+        #   rotate(270 CCW) + MX=0 = correct portrait orientation (no LR flip)
         #
-        # bgr=True  → 0x40 (MX=1, BGR)
-        # bgr=False → 0x48 (MX=1, RGB)
+        # bgr=True  → 0x00 (MX=0, BGR)
+        # bgr=False → 0x08 (MX=0, RGB)
         self.command(ST7735_MADCTL)
-        self.data(0x40 if self._bgr else 0x48)
+        self.data(0x00 if self._bgr else 0x08)
 
         self.command(ST7735_COLMOD)
         self.data(0x05)                 # 16-bit colour
