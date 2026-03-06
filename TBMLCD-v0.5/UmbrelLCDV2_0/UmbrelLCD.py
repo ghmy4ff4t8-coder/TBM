@@ -1,9 +1,13 @@
 
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.23.0 (Umbrel 1.x compatible fork)
+#   Version  : 2.24.0 (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
+#    # v2.24.0: Screen transition default changed to 3s. Screen2 bottom numbers right-aligned.
+#           Screen3 block height number moved lower (x=8). Screen4 order changed to
+#           Date/Day/Time with Asia/Seoul timezone default (pytz). Screen5 additional
+#           Umbrel 1.x container names added. Storage: integer TB (no .0), space before unit.
 #    # v2.22.0: Screen1 icon gap adjusted to 15px (middle value). SATS/USD and temperature
     #           combined into single string for guaranteed same-line alignment.
     #           Temperature now reads from /sys/class/thermal/thermal_zone0/temp (Umbrel/RPi).
@@ -313,8 +317,8 @@ BITCOIN_RPC_USER = _cfg.get('BITCOIN', 'rpc_user', fallback='umbrel')
 # screen_duration  = 30  ; all other screens (2-7)
 # ---------------------------------------------------------------------------
 LOGO_DURATION    = int(_cfg.get('DISPLAY', 'logo_duration',    fallback='10'))
-SCREEN1_DURATION = int(_cfg.get('DISPLAY', 'screen1_duration', fallback='10'))
-SCREEN_DURATION  = int(_cfg.get('DISPLAY', 'screen_duration',  fallback='10'))
+SCREEN1_DURATION = int(_cfg.get('DISPLAY', 'screen1_duration', fallback='3'))
+SCREEN_DURATION  = int(_cfg.get('DISPLAY', 'screen_duration',  fallback='3'))
 BITCOIN_RPC_PASS = _cfg.get('BITCOIN', 'rpc_pass', fallback='moneyprintergobrrr')
 BITCOIN_RPC_HOST = _cfg.get('BITCOIN', 'rpc_host', fallback='127.0.0.1')
 BITCOIN_RPC_PORT = int(_cfg.get('BITCOIN', 'rpc_port', fallback='8332'))
@@ -323,8 +327,11 @@ BITCOIN_RPC_PORT = int(_cfg.get('BITCOIN', 'rpc_port', fallback='8332'))
 # Add new names here if Umbrel changes container naming in a future update.
 BITCOIN_CONTAINER_NAMES = [
     _cfg.get('BITCOIN', 'container', fallback=''),   # user override in config.ini
-    "bitcoin_bitcoind_1",    # Umbrel 0.x / 1.x docker-compose style
+    "bitcoin_bitcoind_1",    # Umbrel 0.x docker-compose style
     "bitcoin-bitcoind-1",   # Umbrel 1.x alternative
+    "app_bitcoind_1",        # Umbrel 1.x app store style
+    "app-bitcoin-bitcoind-1",  # Umbrel 1.x app store alternative
+    "bitcoin-app-bitcoind-1",  # Umbrel 1.x variant
     "bitcoind",             # generic fallback
 ]
 BITCOIN_CONTAINER_NAMES = [n for n in BITCOIN_CONTAINER_NAMES if n]  # remove empty
@@ -332,8 +339,11 @@ BITCOIN_CONTAINER_NAMES = [n for n in BITCOIN_CONTAINER_NAMES if n]  # remove em
 # LND container names to try in order
 LND_CONTAINER_NAMES = [
     _cfg.get('LIGHTNING', 'container', fallback=''),  # user override
-    "lightning_lnd_1",      # Umbrel 0.x / 1.x
+    "lightning_lnd_1",      # Umbrel 0.x
     "lightning-lnd-1",     # Umbrel 1.x alternative
+    "app_lnd_1",            # Umbrel 1.x app store style
+    "app-lightning-lnd-1",  # Umbrel 1.x app store alternative
+    "lightning-app-lnd-1",  # Umbrel 1.x variant
     "lnd",                  # generic fallback
 ]
 LND_CONTAINER_NAMES = [n for n in LND_CONTAINER_NAMES if n]  # remove empty
@@ -613,7 +623,11 @@ def classify_kilo_bytes(num_of_bytes):
     n = int(num_of_bytes) * 1024
     for unit, threshold in [("TB", 1e12), ("GB", 1e9), ("MB", 1e6), ("KB", 1e3)]:
         if n > threshold:
-            return f"{n/threshold:.1f} {unit}"
+            val = n / threshold
+            # Show decimal only if non-zero (e.g. 1 TB not 1.0 TB, but 1.5 TB stays)
+            if val == int(val):
+                return f"{int(val)} {unit}"
+            return f"{val:.1f} {unit}"
     return f"{n} B"
 
 
@@ -880,12 +894,11 @@ def display_block_count_text():
         #   Block height number: displayed large at the bottom
         #
         # Original TBM design: block number shown large at bottom of screen,
-        # centered horizontally. x=2~22 is the bottom strip (after rotate 270).
+        # centered horizontally. Moved slightly lower (x=8) to better match original.
         btc_current_block = get_block_count()
-        # Original TBM design: hard_font_size=40, x=get_inverted_x(72,40)=128-(72+40)=16
         hard_font_size = 40
         block_num_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", hard_font_size)
-        draw_centered_text(screen_buffer, btc_current_block, get_inverted_x(72, hard_font_size), 270, block_num_font)
+        draw_centered_text(screen_buffer, btc_current_block, 8, 270, block_num_font)
     except Exception as e:
         print("Error creating block count text;", str(e))
 
@@ -928,7 +941,7 @@ def draw_screen2():
     draw_left_justified_text(screen_buffer, str(low), low_fee_x, 9, 270, low_fees_font)
     draw_left_justified_text(screen_buffer, str(high), high_fee_x, 88, 270, high_fees_font)
 
-    # Next block TX count (original: font_constant=112, x=43, y=67)
+    # Next block TX count - right-aligned (y=11 from right edge)
     transactions = int(next_block_dict['nTx'])
     txs_number_of_chars = len(str(transactions))
     font_constant = 112
@@ -937,9 +950,9 @@ def draw_screen2():
     else:
         txs_font_size = 28
     txs_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", txs_font_size)
-    draw_left_justified_text(screen_buffer, str(transactions), 43, 67, 270, txs_font)
+    draw_right_justified_text(screen_buffer, str(transactions), 43, 11, 270, txs_font)
 
-    # Unconfirmed TX count (original: font_constant=120, x=7, y=64)
+    # Unconfirmed TX count - right-aligned (y=11 from right edge)
     unconfirmed_txs_number_of_chars = len(unconfirmed_txs)
     font_constant = 120
     if unconfirmed_txs_number_of_chars > 5:
@@ -947,7 +960,7 @@ def draw_screen2():
     else:
         unconfirmed_txs_font_size = 24
     unconfirmed_txs_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", unconfirmed_txs_font_size)
-    draw_left_justified_text(screen_buffer, unconfirmed_txs, 7, 64, 270, unconfirmed_txs_font)
+    draw_right_justified_text(screen_buffer, unconfirmed_txs, 7, 11, 270, unconfirmed_txs_font)
 
 
 def draw_screen3():
@@ -956,16 +969,30 @@ def draw_screen3():
 
 def draw_screen4():
     display_background_image('Screen1@288x.png')
-    now = datetime.datetime.now()
-    time_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 30)
-    day_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 26)
+    # Timezone: configurable via config.ini [DISPLAY] timezone = Asia/Seoul
+    # Default: Asia/Seoul (KST, UTC+9)
+    tz_name = _cfg.get('DISPLAY', 'timezone', fallback='Asia/Seoul')
+    try:
+        import pytz
+        tz = pytz.timezone(tz_name)
+        now = datetime.datetime.now(tz)
+    except Exception:
+        now = datetime.datetime.now()
+    # Order (top to bottom on LCD): Month Day → Day of week → Time
+    # After rotate(270): higher x = lower on screen
+    # x=82 = top, x=43 = middle, x=15 = bottom (approx)
     month_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 22)
-    draw_centered_text(screen_buffer, now.strftime('%-I:%M %p'),
-                       get_inverted_x(16, 30), 270, time_font)
+    day_font   = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 26)
+    time_font  = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 30)
+    # Month Day at top (x=82)
+    draw_centered_text(screen_buffer, now.strftime('%B %d'),
+                       get_inverted_x(16, 22), 270, month_font)
+    # Day of week in middle (x=43)
     draw_centered_text(screen_buffer, now.strftime('%A'),
                        get_inverted_x(59, 26), 270, day_font)
-    draw_centered_text(screen_buffer, now.strftime('%B %d'),
-                       get_inverted_x(91, 22), 270, month_font)
+    # Time at bottom (x=15)
+    draw_centered_text(screen_buffer, now.strftime('%-I:%M %p'),
+                       get_inverted_x(91, 30), 270, time_font)
 
 
 def draw_screen5():
@@ -1123,7 +1150,7 @@ def draw_screen7():
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
-print('Running Umbrel LCD script - Version: 2.23.0 (Umbrel 1.x compatible)')
+print('Running Umbrel LCD script - Version: 2.24.0 (Umbrel 1.x compatible)')
 
 # Display umbrel logo on startup (duration configurable in config.ini)
 display_background_image('umbrel_logo.png')
