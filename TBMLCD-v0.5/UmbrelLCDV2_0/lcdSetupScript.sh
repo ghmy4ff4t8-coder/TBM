@@ -50,6 +50,8 @@ python3 -m pip install $PIP_FLAGS gpiod 2>/dev/null || python3 -m pip install --
 python3 -m pip install $PIP_FLAGS spidev 2>/dev/null || python3 -m pip install --user spidev
 # numpy is used by the bundled st7735_tbm.py driver
 python3 -m pip install $PIP_FLAGS numpy 2>/dev/null || python3 -m pip install --user numpy
+# pytz is used by setup_wizard.py for timezone validation
+python3 -m pip install $PIP_FLAGS pytz 2>/dev/null || python3 -m pip install --user pytz
 
 echo " "
 echo "NOTE: The bundled st7735_tbm.py driver is used (no external ST7735 library needed)."
