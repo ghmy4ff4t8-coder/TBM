@@ -222,13 +222,12 @@ _cfg.read(os.path.join(basedir, 'config.ini'))
 BITCOIN_RPC_USER = _cfg.get('BITCOIN', 'rpc_user', fallback='umbrel')
 
 # ---------------------------------------------------------------------------
-# Screen display durations (seconds) - configurable via config.ini
-# [DISPLAY]
-# logo_duration   = 10  ; startup Umbrel logo screen
-# screen_duration = 4   ; all screens (1-7)
+# Screen display durations (seconds)
+# logo_duration is fixed at 10s (not user-configurable; Umbrel logo timing
+# is handled by the OS and may not respect arbitrary sleep values).
+# screen_duration is configurable via setup wizard / config.ini [DISPLAY]
 # ---------------------------------------------------------------------------
-# Duration settings: wizard result takes priority over config.ini
-LOGO_DURATION  = _wizard_settings['logo_duration']
+LOGO_DURATION   = 10  # fixed: startup Umbrel logo
 SCREEN_DURATION = _wizard_settings['screen_duration']
 BITCOIN_RPC_PASS = _cfg.get('BITCOIN', 'rpc_pass', fallback='moneyprintergobrrr')
 BITCOIN_RPC_HOST = _cfg.get('BITCOIN', 'rpc_host', fallback='127.0.0.1')
@@ -1096,7 +1095,7 @@ try:
 except AttributeError:
     pass  # Windows does not have time.tzset()
 
-# Display umbrel logo on startup (duration configurable in config.ini)
+# Display umbrel logo on startup (fixed 10s; not user-configurable)
 display_background_image('umbrel_logo.png')
 lcd_display(screen_buffer)
 time.sleep(LOGO_DURATION)

@@ -25,7 +25,6 @@ TRANSLATIONS = {
         'timezone':       'Timezone',
         'currency':       'Currency',
         'screens':        'Screens',
-        'logo_duration':  'Logo duration',
         'screen_duration':'Info screen duration',
         'temp_unit':      'Temperature unit',
         'seconds':        's',
@@ -36,12 +35,11 @@ TRANSLATIONS = {
             '2. Timezone',
             '3. Currency',
             '4. Screens to display',
-            '5. Logo duration (seconds)',
-            '6. Info screen duration (seconds)',
-            '7. Temperature unit',
-            '8. Save & Start',
+            '5. Info screen duration (seconds)',
+            '6. Temperature unit',
+            '7. Save & Start',
         ],
-        'menu_prompt':    'Select [1-8]: ',
+        'menu_prompt':    'Select [1-7]: ',
         'saved':          'Settings saved.',
         'starting':       'Starting...',
         # Language selection
@@ -55,7 +53,6 @@ TRANSLATIONS = {
         'screens_prompt': 'Enter screens to show (e.g. 1234567 or 135): ',
         'screens_invalid':'Invalid input. Use digits 1-7 only.',
         # Durations
-        'logo_dur_prompt':'Logo duration in seconds (default 4): ',
         'scr_dur_prompt': 'Info screen duration in seconds (default 4): ',
         'dur_invalid':    'Invalid number. Keeping current: {v}',
         # Temp unit
@@ -69,7 +66,6 @@ TRANSLATIONS = {
         'timezone':       '시간대',
         'currency':       '통화',
         'screens':        '화면',
-        'logo_duration':  '로고 표시 시간',
         'screen_duration':'정보 화면 전환 시간',
         'temp_unit':      '온도 단위',
         'seconds':        '초',
@@ -80,12 +76,11 @@ TRANSLATIONS = {
             '2. 시간대',
             '3. 통화',
             '4. 표시할 화면 선택',
-            '5. 로고 표시 시간 (초)',
-            '6. 정보 화면 전환 시간 (초)',
-            '7. 온도 단위',
-            '8. 저장 후 시작',
+            '5. 정보 화면 전환 시간 (초)',
+            '6. 온도 단위',
+            '7. 저장 후 시작',
         ],
-        'menu_prompt':    '선택 [1-8]: ',
+        'menu_prompt':    '선택 [1-7]: ',
         'saved':          '설정이 저장되었습니다.',
         'starting':       '시작합니다...',
         'select_lang':    '언어를 선택하세요:',
@@ -94,7 +89,6 @@ TRANSLATIONS = {
         'currency_prompt':'통화 코드를 입력하세요 (예: USD, EUR, KRW, JPY): ',
         'screens_prompt': '표시할 화면 번호를 입력하세요 (예: 1234567 또는 135): ',
         'screens_invalid':'잘못된 입력입니다. 1~7 숫자만 사용하세요.',
-        'logo_dur_prompt':'로고 표시 시간(초, 기본값 4): ',
         'scr_dur_prompt': '정보 화면 전환 시간(초, 기본값 4): ',
         'dur_invalid':    '잘못된 숫자입니다. 현재 값 유지: {v}',
         'temp_prompt':    '온도 단위 — 1) 섭씨(°C)  2) 화씨(°F): ',
@@ -107,7 +101,6 @@ TRANSLATIONS = {
         'timezone':       'Zona horaria',
         'currency':       'Moneda',
         'screens':        'Pantallas',
-        'logo_duration':  'Duración del logo',
         'screen_duration':'Duración de pantalla de información',
         'temp_unit':      'Unidad de temperatura',
         'seconds':        's',
@@ -118,12 +111,11 @@ TRANSLATIONS = {
             '2. Zona horaria',
             '3. Moneda',
             '4. Pantallas a mostrar',
-            '5. Duración del logo (segundos)',
-            '6. Duración de pantalla de información (segundos)',
-            '7. Unidad de temperatura',
-            '8. Guardar e iniciar',
+            '5. Duración de pantalla de información (segundos)',
+            '6. Unidad de temperatura',
+            '7. Guardar e iniciar',
         ],
-        'menu_prompt':    'Seleccione [1-8]: ',
+        'menu_prompt':    'Seleccione [1-7]: ',
         'saved':          'Configuración guardada.',
         'starting':       'Iniciando...',
         'select_lang':    'Seleccione idioma:',
@@ -132,7 +124,6 @@ TRANSLATIONS = {
         'currency_prompt':'Ingrese código de moneda (ej. USD, EUR, KRW): ',
         'screens_prompt': 'Ingrese pantallas a mostrar (ej. 1234567 o 135): ',
         'screens_invalid':'Entrada inválida. Use solo dígitos 1-7.',
-        'logo_dur_prompt':'Duración del logo en segundos (predeterminado 4): ',
         'scr_dur_prompt': 'Duración de pantalla de información en segundos (predeterminado 4): ',
         'dur_invalid':    'Número inválido. Manteniendo: {v}',
         'temp_prompt':    'Unidad de temperatura — 1) Celsius (°C)  2) Fahrenheit (°F): ',
@@ -145,7 +136,6 @@ TRANSLATIONS = {
         'timezone':       'タイムゾーン',
         'currency':       '通貨',
         'screens':        '画面',
-        'logo_duration':  'ロゴ表示時間',
         'screen_duration':'情報画面切替時間',
         'temp_unit':      '温度単位',
         'seconds':        '秒',
@@ -156,12 +146,11 @@ TRANSLATIONS = {
             '2. タイムゾーン',
             '3. 通貨',
             '4. 表示する画面',
-            '5. ロゴ表示時間（秒）',
-            '6. 情報画面切替時間（秒）',
-            '7. 温度単位',
-            '8. 保存して開始',
+            '5. 情報画面切替時間（秒）',
+            '6. 温度単位',
+            '7. 保存して開始',
         ],
-        'menu_prompt':    '選択 [1-8]: ',
+        'menu_prompt':    '選択 [1-7]: ',
         'saved':          '設定が保存されました。',
         'starting':       '開始します...',
         'select_lang':    '言語を選択してください:',
@@ -170,7 +159,6 @@ TRANSLATIONS = {
         'currency_prompt':'通貨コードを入力してください（例: USD, EUR, JPY）: ',
         'screens_prompt': '表示する画面番号を入力してください（例: 1234567 または 135）: ',
         'screens_invalid':'無効な入力です。1〜7の数字のみ使用してください。',
-        'logo_dur_prompt':'ロゴ表示時間（秒、デフォルト4）: ',
         'scr_dur_prompt': '情報画面切替時間（秒、デフォルト4）: ',
         'dur_invalid':    '無効な数値です。現在の値を維持: {v}',
         'temp_prompt':    '温度単位 — 1) 摂氏（°C）  2) 華氏（°F）: ',
@@ -183,7 +171,6 @@ TRANSLATIONS = {
         'timezone':       '时区',
         'currency':       '货币',
         'screens':        '屏幕',
-        'logo_duration':  'Logo显示时间',
         'screen_duration':'信息屏幕切换时间',
         'temp_unit':      '温度单位',
         'seconds':        '秒',
@@ -194,12 +181,11 @@ TRANSLATIONS = {
             '2. 时区',
             '3. 货币',
             '4. 显示的屏幕',
-            '5. Logo显示时间（秒）',
-            '6. 信息屏幕切换时间（秒）',
-            '7. 温度单位',
-            '8. 保存并开始',
+            '5. 信息屏幕切换时间（秒）',
+            '6. 温度单位',
+            '7. 保存并开始',
         ],
-        'menu_prompt':    '选择 [1-8]: ',
+        'menu_prompt':    '选择 [1-7]: ',
         'saved':          '设置已保存。',
         'starting':       '正在启动...',
         'select_lang':    '请选择语言:',
@@ -208,7 +194,6 @@ TRANSLATIONS = {
         'currency_prompt':'请输入货币代码（例如: USD, EUR, CNY）: ',
         'screens_prompt': '请输入要显示的屏幕编号（例如: 1234567 或 135）: ',
         'screens_invalid':'输入无效。请只使用1-7的数字。',
-        'logo_dur_prompt':'Logo显示时间（秒，默认4）: ',
         'scr_dur_prompt': '信息屏幕切换时间（秒，默认4）: ',
         'dur_invalid':    '无效的数字。保持当前值: {v}',
         'temp_prompt':    '温度单位 — 1) 摄氏度（°C）  2) 华氏度（°F）: ',
@@ -471,7 +456,6 @@ def run_wizard(config_path):
     timezone  = _get(cfg, 'USER', 'timezone',  'UTC')
     screens   = _get(cfg, 'USER', 'screens',   '1234567')
     temp_unit = _get(cfg, 'USER', 'temp_unit', 'C')
-    logo_dur  = int(_get(cfg, 'DISPLAY', 'logo_duration',   '4'))
     scr_dur   = int(_get(cfg, 'DISPLAY', 'screen_duration', '4'))
 
     # Build human-readable screens string
@@ -485,7 +469,6 @@ def run_wizard(config_path):
     print(f"  {t['timezone']:20s}: {timezone}")
     print(f"  {t['currency']:20s}: {currency}")
     print(f"  {t['screens']:20s}: {screens_display}")
-    print(f"  {t['logo_duration']:20s}: {logo_dur}{t['seconds']}")
     print(f"  {t['screen_duration']:20s}: {scr_dur}{t['seconds']}")
     print(f"  {t['temp_unit']:20s}: {temp_display}")
     print()
@@ -516,12 +499,10 @@ def run_wizard(config_path):
             elif choice == '4':
                 _menu_screens(cfg, t)
             elif choice == '5':
-                _menu_logo_duration(cfg, t)
-            elif choice == '6':
                 _menu_screen_duration(cfg, t)
-            elif choice == '7':
+            elif choice == '6':
                 _menu_temp_unit(cfg, t)
-            elif choice == '8':
+            elif choice == '7':
                 _save_config(cfg, config_path)
                 print(t['saved'])
                 print(t['starting'])
@@ -535,7 +516,6 @@ def run_wizard(config_path):
     timezone  = _get(cfg, 'USER', 'timezone',  'UTC')
     screens   = _get(cfg, 'USER', 'screens',   '1234567')
     temp_unit = _get(cfg, 'USER', 'temp_unit', 'C')
-    logo_dur  = int(_get(cfg, 'DISPLAY', 'logo_duration',   '4'))
     scr_dur   = int(_get(cfg, 'DISPLAY', 'screen_duration', '4'))
 
     # Convert screens string (e.g. '1234567') to userScreenChoices format
@@ -546,7 +526,6 @@ def run_wizard(config_path):
         'screens':         screens_choices,
         'timezone':        timezone,
         'temp_unit':       temp_unit,
-        'logo_duration':   logo_dur,
         'screen_duration': scr_dur,
         'language':        lang,
     }

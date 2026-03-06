@@ -74,7 +74,6 @@ T() {
                 DURATION_HEADER)   echo "Screen Duration Setup (seconds)" ;;
                 DURATION_INTRO)    echo "Enter the time in seconds for each screen to be displayed." ;;
                 DURATION_DEFAULT)  echo "Press Enter to keep the current default value." ;;
-                DUR_LOGO)          echo "Umbrel logo at startup (current default: ${2}s): " ;;
                 DUR_OTHER)         echo "Info screen duration (current default: ${2}s): " ;;
                 TZ_PROMPT)         echo "Enter timezone (e.g. Asia/Seoul, America/New_York, Europe/London): " ;;
                 TZ_INVALID)        echo "Invalid timezone. Please try again." ;;
@@ -113,7 +112,6 @@ T() {
                 DURATION_HEADER)   echo "화면 전환 시간 설정 (초)" ;;
                 DURATION_INTRO)    echo "각 화면이 표시될 시간을 초 단위로 입력하세요." ;;
                 DURATION_DEFAULT)  echo "Enter 키를 누르면 현재 기본값이 그대로 유지됩니다." ;;
-                DUR_LOGO)          echo "시작 로고 표시 시간 (현재 기본값: ${2}초): " ;;
                 DUR_OTHER)         echo "정보 화면 전환 시간 (현재 기본값: ${2}초): " ;;
                 TZ_PROMPT)         echo "시간대를 입력하세요 (예: Asia/Seoul, America/New_York): " ;;
                 TZ_INVALID)        echo "유효하지 않은 시간대입니다. 다시 시도해주세요." ;;
@@ -152,7 +150,6 @@ T() {
                 DURATION_HEADER)   echo "Configuración de Duración de Pantalla (segundos)" ;;
                 DURATION_INTRO)    echo "Ingrese el tiempo en segundos que se mostrará cada pantalla." ;;
                 DURATION_DEFAULT)  echo "Presione Enter para mantener el valor predeterminado actual." ;;
-                DUR_LOGO)          echo "Logotipo de Umbrel al inicio (predeterminado actual: ${2}s): " ;;
                 DUR_OTHER)         echo "Duración de pantalla de información (predeterminado actual: ${2}s): " ;;
                 TZ_PROMPT)         echo "Ingrese zona horaria (ej. America/New_York, Europe/Madrid): " ;;
                 TZ_INVALID)        echo "Zona horaria inválida. Por favor, inténtelo de nuevo." ;;
@@ -191,7 +188,6 @@ T() {
                 DURATION_HEADER)   echo "画面表示時間の設定（秒）" ;;
                 DURATION_INTRO)    echo "各画面が表示される時間を秒単位で入力してください。" ;;
                 DURATION_DEFAULT)  echo "現在のデフォルト値を維持するにはEnterキーを押してください。" ;;
-                DUR_LOGO)          echo "起動時のUmbrelロゴ（現在のデフォルト：${2}秒）：" ;;
                 DUR_OTHER)         echo "情報画面切替時間（現在のデフォルト：${2}秒）：" ;;
                 TZ_PROMPT)         echo "タイムゾーンを入力してください（例: Asia/Tokyo, America/New_York）：" ;;
                 TZ_INVALID)        echo "無効なタイムゾーンです。もう一度お試しください。" ;;
@@ -230,7 +226,6 @@ T() {
                 DURATION_HEADER)   echo "屏幕持续时间设置（秒）" ;;
                 DURATION_INTRO)    echo "请输入每个屏幕显示的秒数。" ;;
                 DURATION_DEFAULT)  echo "按 Enter 键以保留当前默认值。" ;;
-                DUR_LOGO)          echo "启动时的 Umbrel 徽标（当前默认值：${2}秒）：" ;;
                 DUR_OTHER)         echo "信息屏幕切换时间（当前默认值：${2}秒）：" ;;
                 TZ_PROMPT)         echo "请输入时区（例如: Asia/Shanghai, America/New_York）：" ;;
                 TZ_INVALID)        echo "无效的时区。请重试。" ;;
@@ -269,8 +264,7 @@ read_config_value() {
     echo "$fallback"
 }
 
-DEFAULT_LOGO=$(read_config_value "logo_duration" "10")
-DEFAULT_OTHER=$(read_config_value "screen_duration" "10")
+DEFAULT_OTHER=$(read_config_value "screen_duration" "4")
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Setup Start
@@ -373,7 +367,7 @@ echo
 # ──────────────────────────────────────────────────────────────────────────────
 # Duration Setup  (logo + all screens — no separate bitcoin price duration)
 # ──────────────────────────────────────────────────────────────────────────────
-echo "--- [ 4/4 ] $(T DURATION_HEADER) ---"
+echo "--- [ 3/3 ] $(T DURATION_HEADER) ---"
 echo
 echo "$(T DURATION_INTRO)"
 echo "$(T DURATION_DEFAULT)"
@@ -398,7 +392,6 @@ ask_duration() {
     done
 }
 
-ask_duration "$(T DUR_LOGO "$DEFAULT_LOGO")" "$DEFAULT_LOGO" "Logo" logoDuration
 ask_duration "$(T DUR_OTHER "$DEFAULT_OTHER")" "$DEFAULT_OTHER" "Screen" screenDuration
 echo
 
@@ -418,7 +411,6 @@ screens = ${userScreenChoices//Screen/}
 temp_unit = C
 
 [DISPLAY]
-logo_duration   = ${logoDuration}
 screen_duration = ${screenDuration}
 
 [BITCOIN]
