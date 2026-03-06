@@ -49,7 +49,7 @@ detect_timezone() {
 # ──────────────────────────────────────────────────────────────────────────────
 # Read current defaults from config.ini (if it exists)
 # ──────────────────────────────────────────────────────────────────────────────
-cwd=$(pwd)
+cwd="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CONFIG_FILE="${cwd}/config.ini"
 
 read_config_value() {
@@ -147,7 +147,7 @@ gettingCurrency=true
 while $gettingCurrency; do
     read -rp "  Enter currency code: " newCurrency
     newCurrency="${newCurrency^^}"
-    validationResult=$(python3 ./CurrencyData.py "${newCurrency}")
+    validationResult=$(python3 "${cwd}/CurrencyData.py" "${newCurrency}")
     if [ "$validationResult" = "Valid" ]; then
         echo -e "  \e[1;32m✔ Currency set to: ${newCurrency}\e[0m"
         gettingCurrency=false
