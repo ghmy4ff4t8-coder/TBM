@@ -1,9 +1,14 @@
 
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.16.0 (Umbrel 1.x compatible fork)
+#   Version  : 2.17.0 (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
+#    # v2.17.0: Fixed text 180-degree inversion: all draw_*_text angle changed
+#           from 90 to 270. Background images and icons use rotate(270) and
+#           display correctly; text was rendered with rotate(90) which is
+#           180 degrees opposite, causing all text to appear upside-down and
+#           left-right mirrored. rotate(270) matches the background orientation.
 #    # v2.16.0: Fixed horizontal text mirroring: MADCTL changed from 0x40 (MX=1)
 #           to 0x00 (MX=0) in st7735_tbm.py. MX=1 caused all text to appear
 #           left-right flipped on hardware. rotate(270 CCW) + MX=0 is the
@@ -795,16 +800,16 @@ def display_price_text(currency):
         safe_font_size = min(font_size, 32)
         font_x = get_corrected_x_position(39, safe_font_size, 64)
         price_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", safe_font_size)
-        draw_left_justified_text(screen_buffer, newPrice, font_x, 30, 90, price_font)
+        draw_left_justified_text(screen_buffer, newPrice, font_x, 30, 270, price_font)
 
         # Currency label: right-justified in right half
         cur_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 12)
-        draw_right_justified_text(screen_buffer, currency, 64, 4, 90, cur_font)
+        draw_right_justified_text(screen_buffer, currency, 64, 4, 270, cur_font)
 
         # SATS/USD label in left half (x=1~26)
         sat_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 14)
         draw_left_justified_text(screen_buffer, "SATS / " + currency,
-                                 1, 39, 90, sat_font)
+                                 1, 39, 270, sat_font)
 
         # SAT value in left half (x=27~54)
         sat_val = str(int(100_000_000 / price)) if price else "0"
@@ -813,7 +818,7 @@ def display_price_text(currency):
         safe_sf = min(sf, 40)
         sat_font2 = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", safe_sf)
         fx2 = get_corrected_x_position(50, safe_sf, 27)
-        draw_left_justified_text(screen_buffer, sat_val, fx2, 30, 90, sat_font2)
+        draw_left_justified_text(screen_buffer, sat_val, fx2, 30, 270, sat_font2)
     except Exception as e:
         print("Error creating price text;", str(e))
 
@@ -831,7 +836,7 @@ def display_temperature():
     except Exception:
         temperature = "--'C"
     temp_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 12)
-    draw_right_justified_text(screen_buffer, temperature, 3, 3, 90, temp_font)
+    draw_right_justified_text(screen_buffer, temperature, 3, 3, 270, temp_font)
 
 
 def display_block_count_text():
@@ -847,7 +852,7 @@ def display_block_count_text():
         fs = 18 if n <= 6 else (14 if n == 7 else 12)
         font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", fs)
         # Place in left strip (x=1), centered vertically on y-axis
-        draw_centered_text(screen_buffer, btc_current_block, 1, 90, font)
+        draw_centered_text(screen_buffer, btc_current_block, 1, 270, font)
     except Exception as e:
         print("Error creating block count text;", str(e))
 
@@ -870,17 +875,17 @@ def draw_screen2():
     high_fs = fee_font_size(len(str(high)))
     low_x = 90 if len(str(low)) == 3 else 85
     high_x = 90 if len(str(high)) == 3 else 85
-    draw_left_justified_text(screen_buffer, str(low), low_x, 9, 90,
+    draw_left_justified_text(screen_buffer, str(low), low_x, 9, 270,
                              ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", low_fs))
-    draw_left_justified_text(screen_buffer, str(high), high_x, 88, 90,
+    draw_left_justified_text(screen_buffer, str(high), high_x, 88, 270,
                              ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", high_fs))
     txs = int(next_block_dict['nTx'])
     txs_fs = int(112 / len(str(txs))) if len(str(txs)) > 4 else 28
-    draw_left_justified_text(screen_buffer, str(txs), 43, 67, 90,
+    draw_left_justified_text(screen_buffer, str(txs), 43, 67, 270,
                              ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", txs_fs))
     u_n = len(unconfirmed_txs)
     u_fs = int(120 / u_n) if u_n > 5 else 24
-    draw_left_justified_text(screen_buffer, unconfirmed_txs, 7, 64, 90,
+    draw_left_justified_text(screen_buffer, unconfirmed_txs, 7, 64, 270,
                              ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", u_fs))
 
 
@@ -895,11 +900,11 @@ def draw_screen4():
     day_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 26)
     month_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 22)
     draw_centered_text(screen_buffer, now.strftime('%-I:%M %p'),
-                       get_inverted_x(16, 30), 90, time_font)
+                       get_inverted_x(16, 30), 270, time_font)
     draw_centered_text(screen_buffer, now.strftime('%A'),
-                       get_inverted_x(59, 26), 90, day_font)
+                       get_inverted_x(59, 26), 270, day_font)
     draw_centered_text(screen_buffer, now.strftime('%B %d'),
-                       get_inverted_x(91, 22), 90, month_font)
+                       get_inverted_x(91, 22), 270, month_font)
 
 
 def draw_screen5():
@@ -924,7 +929,7 @@ def draw_screen5():
     n = len(conn_str)
     conn_y = 23 if n == 2 else (27 if n == 1 else 19)
     conn_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 15)
-    draw_left_justified_text(screen_buffer, conn_str, 68, conn_y, 90, conn_font)
+    draw_left_justified_text(screen_buffer, conn_str, 68, conn_y, 270, conn_font)
 
     mem = get_mempool_info()
     if mem and isinstance(mem, str) and len(mem.split()) >= 2:
@@ -934,10 +939,10 @@ def draw_screen5():
     n = len(mem_val)
     mem_y = 101 if n == 2 else (108 if n == 1 else 98)
     mem_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 15)
-    draw_left_justified_text(screen_buffer, mem_val, 68, mem_y, 90, mem_font)
+    draw_left_justified_text(screen_buffer, mem_val, 68, mem_y, 270, mem_font)
     unit_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 9)
-    draw_left_justified_text(screen_buffer, mem_unit, 55, 105, 90, unit_font)
-    draw_left_justified_text(screen_buffer, "Peers", 55, 22, 90, unit_font)
+    draw_left_justified_text(screen_buffer, mem_unit, 55, 105, 270, unit_font)
+    draw_left_justified_text(screen_buffer, "Peers", 55, 22, 270, unit_font)
 
     hr = get_network_hash_ps()
     if hr and isinstance(hr, str) and len(hr.split()) >= 2:
@@ -947,9 +952,9 @@ def draw_screen5():
     n = len(hr_val)
     hr_y = 23 if n == 2 else (27 if n == 1 else 19)
     hr_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 15)
-    draw_left_justified_text(screen_buffer, hr_val, 22, hr_y, 90, hr_font)
+    draw_left_justified_text(screen_buffer, hr_val, 22, hr_y, 270, hr_font)
     hr_unit_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 9)
-    draw_left_justified_text(screen_buffer, hr_unit, 8, 22, 90, hr_unit_font)
+    draw_left_justified_text(screen_buffer, hr_unit, 8, 22, 270, hr_unit_font)
 
     bs = get_blockchain_size()
     if bs and isinstance(bs, str) and len(bs.split()) >= 2:
@@ -959,9 +964,9 @@ def draw_screen5():
     n = len(bs_val)
     bs_y = 101 if n == 2 else (108 if n == 1 else 98)
     bs_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 15)
-    draw_left_justified_text(screen_buffer, bs_val, 22, bs_y, 90, bs_font)
+    draw_left_justified_text(screen_buffer, bs_val, 22, bs_y, 270, bs_font)
     bs_unit_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 9)
-    draw_left_justified_text(screen_buffer, bs_unit, 8, 105, 90, bs_unit_font)
+    draw_left_justified_text(screen_buffer, bs_unit, 8, 105, 270, bs_unit_font)
 
 
 def draw_screen6():
@@ -988,14 +993,14 @@ def draw_screen6():
     n = len(str(connections))
     conn_y = 23 if n == 2 else (27 if n == 1 else 19)
     conn_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 15)
-    draw_left_justified_text(screen_buffer, str(connections), 68, conn_y, 90, conn_font)
+    draw_left_justified_text(screen_buffer, str(connections), 68, conn_y, 270, conn_font)
     n = len(str(active_channels))
     ch_y = 101 if n == 2 else (108 if n == 1 else 98)
     ch_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 15)
-    draw_left_justified_text(screen_buffer, str(active_channels), 68, ch_y, 90, ch_font)
+    draw_left_justified_text(screen_buffer, str(active_channels), 68, ch_y, 270, ch_font)
     label_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 9)
-    draw_left_justified_text(screen_buffer, "Channels", 55, 98, 90, label_font)
-    draw_left_justified_text(screen_buffer, "Peers", 55, 22, 90, label_font)
+    draw_left_justified_text(screen_buffer, "Channels", 55, 98, 270, label_font)
+    draw_left_justified_text(screen_buffer, "Peers", 55, 22, 270, label_font)
     bal = get_lnd_channel_balance()
     if not bal:
         return
@@ -1006,15 +1011,15 @@ def draw_screen6():
     send_y_map = {1: 27, 2: 23, 3: 19, 4: 15, 5: 10}
     send_y = send_y_map.get(n, 6)
     send_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 15)
-    draw_left_justified_text(screen_buffer, send_val, 22, send_y, 90, send_font)
+    draw_left_justified_text(screen_buffer, send_val, 22, send_y, 270, send_font)
     n = len(recv_val)
     recv_y_map = {1: 108, 2: 101, 3: 98, 4: 93, 5: 90}
     recv_y = recv_y_map.get(n, 90)
     recv_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 15)
-    draw_left_justified_text(screen_buffer, recv_val, 22, recv_y, 90, recv_font)
+    draw_left_justified_text(screen_buffer, recv_val, 22, recv_y, 270, recv_font)
     btc_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 10)
-    draw_left_justified_text(screen_buffer, recv_unit, 8, 100, 90, btc_font)
-    draw_left_justified_text(screen_buffer, send_unit, 8, 22, 90, btc_font)
+    draw_left_justified_text(screen_buffer, recv_unit, 8, 100, 270, btc_font)
+    draw_left_justified_text(screen_buffer, send_unit, 8, 22, 270, btc_font)
 
 
 def draw_screen7():
@@ -1037,11 +1042,11 @@ def draw_screen7():
     #   Row 3 (x=50~60):  "1.5TB available" small text
     #   Progress bar (x=65~77): moved to avoid icon overlap
 
-    draw_left_justified_text(screen_buffer, used_space, 59, 7, 90,
+    draw_left_justified_text(screen_buffer, used_space, 59, 7, 270,
                              ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 20))
-    draw_left_justified_text(screen_buffer, "Used out of " + disk_capacity, 44, 7, 90,
+    draw_left_justified_text(screen_buffer, "Used out of " + disk_capacity, 44, 7, 270,
                              ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 11))
-    draw_right_justified_text(screen_buffer, available_space + " available", 13, 11, 90,
+    draw_right_justified_text(screen_buffer, available_space + " available", 13, 11, 270,
                               ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 11))
     draw_sb = ImageDraw.Draw(screen_buffer)
     x, y, w, h = 29, 7, 2, 140
@@ -1053,7 +1058,7 @@ def draw_screen7():
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
-print('Running Umbrel LCD script - Version: 2.16.0 (Umbrel 1.x compatible)')
+print('Running Umbrel LCD script - Version: 2.17.0 (Umbrel 1.x compatible)')
 
 # Display umbrel logo on startup (duration configurable in config.ini)
 display_background_image('umbrel_logo.png')
