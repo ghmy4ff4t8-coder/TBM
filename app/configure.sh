@@ -276,7 +276,11 @@ EOF
 sudo chmod 644 /lib/systemd/system/tbm-umbrel.service
 sudo systemctl daemon-reload
 sudo systemctl enable tbm-umbrel.service
-sudo systemctl start tbm-umbrel.service
+if sudo systemctl is-active --quiet tbm-umbrel; then
+    sudo systemctl restart tbm-umbrel.service
+else
+    sudo systemctl start tbm-umbrel.service
+fi
 
 echo
 echo -e "\e[1;32m✔ LCD Service setup complete!\e[0m"
