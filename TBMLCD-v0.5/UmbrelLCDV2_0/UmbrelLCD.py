@@ -39,7 +39,7 @@
 
 
 
-160, 3).
+#         160, 3).
 #         Now the byte stream has 128 'rows' of 160 pixels, matching the
 #         landscape MADCTL scan direction. The image appears correctly oriented.
 #
@@ -102,6 +102,7 @@ import os
 import configparser
 import requests
 
+from setup_wizard import run_wizard
 from st7735_tbm import ST7735
 from connections import test_tor, tor_request
 
@@ -185,11 +186,22 @@ images_path = filePath+'/images/'
 # Customizable fonts path
 poppins_fonts_path = filePath+'/poppins/'
 
-# Currency as a global variable
-currency = sys.argv[1]
+# ---------------------------------------------------------------------------
+# Interactive setup wizard
+# Reads config.ini, shows current settings, prompts user (10s timeout),
+# and returns effective settings for this run.
+# ---------------------------------------------------------------------------
+_config_path = os.path.join(basedir, 'config.ini')
+_wizard_settings = run_wizard(_config_path)
 
-# User screen options
-userScreenChoices = sys.argv[2]
+# Currency as a global variable (from wizard / config.ini)
+currency = _wizard_settings['currency']
+
+# User screen options (from wizard / config.ini)
+userScreenChoices = _wizard_settings['screens']
+
+# Temperature unit (from wizard / config.ini)
+TEMP_UNIT = _wizard_settings['temp_unit']  # 'C' or 'F'
 
 # Initial mempool url
 mempool_url = "https://mempool.space"
@@ -216,9 +228,10 @@ BITCOIN_RPC_USER = _cfg.get('BITCOIN', 'rpc_user', fallback='umbrel')
 # screen1_duration = 60  ; Bitcoin price screen
 # screen_duration  = 30  ; all other screens (2-7)
 # ---------------------------------------------------------------------------
-LOGO_DURATION    = int(_cfg.get('DISPLAY', 'logo_duration',    fallback='10'))
-SCREEN1_DURATION = int(_cfg.get('DISPLAY', 'screen1_duration', fallback='3'))
-SCREEN_DURATION  = int(_cfg.get('DISPLAY', 'screen_duration',  fallback='3'))
+# Duration settings: wizard result takes priority over config.ini
+LOGO_DURATION    = _wizard_settings['logo_duration']
+SCREEN1_DURATION = _wizard_settings['screen_duration']
+SCREEN_DURATION  = _wizard_settings['screen_duration']
 BITCOIN_RPC_PASS = _cfg.get('BITCOIN', 'rpc_pass', fallback='moneyprintergobrrr')
 BITCOIN_RPC_HOST = _cfg.get('BITCOIN', 'rpc_host', fallback='127.0.0.1')
 BITCOIN_RPC_PORT = int(_cfg.get('BITCOIN', 'rpc_port', fallback='8332'))
@@ -792,10 +805,17 @@ def display_price_text(currency):
 
 
 def get_temperature():
-    """Read CPU temperature and return as string like '51'C'. Returns '--'C' on failure."""
+    """Read CPU temperature and return as string like '51'C' or '124'F'.
+    Unit is controlled by the global TEMP_UNIT variable ('C' or 'F').
+    Returns '--'C' (or '--'F') on failure.
+    """
+    unit_suffix = "'F" if TEMP_UNIT == 'F' else "'C"
     try:
         with open('/sys/class/thermal/thermal_zone0/temp') as f:
-            return str(int(int(f.read().strip()) / 1000)) + "'C"
+            celsius = int(int(f.read().strip()) / 1000)
+            if TEMP_UNIT == 'F':
+                return str(int(celsius * 9 / 5 + 32)) + unit_suffix
+            return str(celsius) + unit_suffix
     except Exception:
         pass
     try:
@@ -803,10 +823,13 @@ def get_temperature():
                            stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         if r.returncode == 0:
             raw = r.stdout.decode().replace("temp=", "").replace("'C", "").strip()
-            return str(int(float(raw))) + "'C"
+            celsius = float(raw)
+            if TEMP_UNIT == 'F':
+                return str(int(celsius * 9 / 5 + 32)) + unit_suffix
+            return str(int(celsius)) + unit_suffix
     except Exception:
         pass
-    return "--'C"
+    return "--" + unit_suffix
 
 
 def display_block_count_text():
@@ -892,9 +915,8 @@ def draw_screen3():
 
 def draw_screen4():
     display_background_image('Screen1@288x.png')
-    # Timezone: configurable via config.ini [DISPLAY] timezone = Asia/Seoul
-    # Default: Asia/Seoul (KST, UTC+9)
-    tz_name = _cfg.get('DISPLAY', 'timezone', fallback='Asia/Seoul')
+    # Timezone: from wizard settings (config.ini [USER] timezone)
+    tz_name = _wizard_settings.get('timezone', 'UTC')
     try:
         import pytz
         tz = pytz.timezone(tz_name)
@@ -1058,6 +1080,14 @@ def draw_screen7():
 # Main loop
 # ---------------------------------------------------------------------------
 print('Running Umbrel LCD script - Version: 2.32.0 (Umbrel 1.x compatible)')
+print(f'  Currency: {currency} | Screens: {userScreenChoices} | Temp: {TEMP_UNIT} | TZ: {_wizard_settings["timezone"]}')
+
+# Apply timezone from wizard settings
+os.environ['TZ'] = _wizard_settings['timezone']
+try:
+    time.tzset()
+except AttributeError:
+    pass  # Windows does not have time.tzset()
 
 # Display umbrel logo on startup (duration configurable in config.ini)
 display_background_image('umbrel_logo.png')
