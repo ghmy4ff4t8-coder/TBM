@@ -1,14 +1,18 @@
 #!/bin/bash
 #-------------------------------------------------------------------------------
 #   Copyright (c) DOIDO Technologies
-#   Version  : 2.0.0
+#   Version  : 2.1.0
 #   Changes  :
+#     v2.1.0: Added timezone confirmation step (auto-detect + manual override).
+#             Service auto-restarts after reconfiguration.
+#             Fixed CurrencyData.py path to be script-relative.
+#             Renamed service to tbm-umbrel.
+#             Added y/n shorthand support for screen selection.
 #     v2.0.0: Removed multi-language support (English only).
 #             Removed manual timezone input — auto-detected from system.
 #             Removed logo_duration setting (hardcoded to 10s in tbm.py).
 #             Removed screen1_duration (single screen_duration for all screens).
 #     v1.6.0: Fixed syntax error - ES/JA/ZH language blocks were outside T().
-#             Removed screen1_duration; single screen_duration for all screens.
 #     v1.5.0: Korean yes/no support added.
 #     v1.4.0: Fixed language selection. Duration prompts read from config.ini.
 #     v1.3.0: Added multi-language support (EN/KR).

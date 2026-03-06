@@ -14,12 +14,13 @@
     1.  **Bitcoin Price:** Real-time price and sats/currency value with thousands separator.
     2.  **Next Block Info:** Estimated fees for next block.
     3.  **Block Height:** Current Bitcoin block height.
-    4.  **Date & Time:** System date and time (timezone auto-detected from system).
+    4.  **Date & Time:** System date and time.
     5.  **Network Info:** Umbrel IP address and network status.
     6.  **Lightning Channels:** Active/inactive channel count.
     7.  **Disk Usage:** Umbrel storage usage.
-*   **Interactive Setup Wizard:** Guides you through screen selection, currency (46 supported), temperature unit, and screen duration.
-*   **Auto-Start:** Runs as a `systemd` service, starting automatically on boot.
+*   **Interactive Setup Wizard:** Guides you through timezone confirmation, screen selection, currency (46 supported), temperature unit, and screen duration.
+*   **Smart Timezone Detection:** Auto-detects timezone from the system. If incorrect, you can manually enter any IANA timezone.
+*   **Auto-Start & Restart:** Runs as a `tbm-umbrel` systemd service, starting automatically on boot and restarting after reconfiguration.
 *   **Umbrel 1.x Ready:** Works with the latest Umbrel OS, including robust fallback logic for changing Docker container names.
 
 ## Repository Structure
@@ -84,7 +85,7 @@ These instructions are for a fresh installation on an Umbrel node. All commands 
     cd ~/TBM/app
     ```
 
-3.  **Run the service setup wizard.** This will guide you through selecting which screens to display, your currency, and screen duration. It will then create and start the background service.
+3.  **Run the service setup wizard.** This will guide you through all settings and then automatically start the service.
     ```bash
     bash configure.sh
     ```
@@ -107,7 +108,7 @@ That's it! Your LCD should now be running.
     ```
 *   **Re-run Setup Wizard:**
     ```bash
-    sudo systemctl stop tbm-umbrel && bash ~/TBM/app/configure.sh
+    bash ~/TBM/app/configure.sh
     ```
 
 ## Updating
@@ -144,6 +145,7 @@ bash uninstall.sh
 
 ## Troubleshooting
 
+*   **Wrong Timezone:** Run `bash ~/TBM/app/configure.sh` again. When it asks if the auto-detected timezone is correct, answer `n` and enter your timezone manually (e.g., `America/New_York`).
 *   **White Screen:** Check your GPIO wiring. Also verify the service is running with `sudo systemctl status tbm-umbrel`.
 *   **Garbled/Stripey Display:** This fork includes a bundled ST7735 driver (`st7735_tbm.py`) tuned for the TBM 1.8" panel. If issues persist, it may be a hardware problem.
 *   **`config.ini` Conflicts on `git pull`:** Use `git stash` before pulling (see Updating section above).
