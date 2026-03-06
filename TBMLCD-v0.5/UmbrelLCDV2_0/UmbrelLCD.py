@@ -1,7 +1,7 @@
 
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.22.0 (Umbrel 1.x compatible fork)
+#   Version  : 2.23.0 (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
 #    # v2.22.0: Screen1 icon gap adjusted to 15px (middle value). SATS/USD and temperature
@@ -846,7 +846,7 @@ def display_price_text(currency):
         # SATS/USD + temperature on the SAME line: combine into one string
         # This guarantees perfect alignment - single draw call, single x position
         temperature = get_temperature()
-        sats_msg = "SATS / " + currency + "   " + temperature
+        sats_msg = "SATS / " + currency + "   " + temperature + " "
         bottom_label_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 14)
         bottom_x = get_inverted_x(111, 14)
         draw_left_justified_text(screen_buffer, sats_msg, bottom_x, 47, 270, bottom_label_font)
@@ -1123,7 +1123,7 @@ def draw_screen7():
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
-print('Running Umbrel LCD script - Version: 2.22.0 (Umbrel 1.x compatible)')
+print('Running Umbrel LCD script - Version: 2.23.0 (Umbrel 1.x compatible)')
 
 # Display umbrel logo on startup (duration configurable in config.ini)
 display_background_image('umbrel_logo.png')
