@@ -1,7 +1,7 @@
 
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.27.0 (Umbrel 1.x compatible fork)
+#   Version  : 2.28.0 (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
 #    # v2.24.0: Screen transition default changed to 3s. Screen2 bottom numbers right-aligned.
@@ -865,9 +865,9 @@ def display_price_text(currency):
         price_x = get_corrected_x_position(39, price_font_size, 69)
         draw_left_justified_text(screen_buffer, newPrice, price_x, 36, 270, price_font)
 
-        # Currency label: 12px, left-justified (top-right corner of landscape view)
+        # Currency label: 12px, right-justified (original TBM design)
         cur_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 12)
-        draw_left_justified_text(screen_buffer, currency, 113, 4, 270, cur_font)
+        draw_right_justified_text(screen_buffer, currency, get_inverted_x(1, 12), 4, 270, cur_font)
 
         # SAT value: same formula as BTC price but capped at price_font_size
         sat_val = str(int(100_000_000 / price)) if price else "0"
@@ -1165,7 +1165,7 @@ def draw_screen7():
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
-print('Running Umbrel LCD script - Version: 2.27.0 (Umbrel 1.x compatible)')
+print('Running Umbrel LCD script - Version: 2.28.0 (Umbrel 1.x compatible)')
 
 # Display umbrel logo on startup (duration configurable in config.ini)
 display_background_image('umbrel_logo.png')
