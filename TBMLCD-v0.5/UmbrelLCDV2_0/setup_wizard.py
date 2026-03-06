@@ -416,7 +416,6 @@ def _menu_screen_duration(cfg, t):
         if 'DISPLAY' not in cfg:
             cfg['DISPLAY'] = {}
         cfg['DISPLAY']['screen_duration'] = str(v)
-        cfg['DISPLAY']['screen1_duration'] = str(v)
     except ValueError:
         print(t['dur_invalid'].format(v=current))
 

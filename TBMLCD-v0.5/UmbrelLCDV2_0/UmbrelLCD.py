@@ -224,14 +224,12 @@ BITCOIN_RPC_USER = _cfg.get('BITCOIN', 'rpc_user', fallback='umbrel')
 # ---------------------------------------------------------------------------
 # Screen display durations (seconds) - configurable via config.ini
 # [DISPLAY]
-# logo_duration   = 60   ; startup Umbrel logo screen
-# screen1_duration = 60  ; Bitcoin price screen
-# screen_duration  = 30  ; all other screens (2-7)
+# logo_duration   = 10  ; startup Umbrel logo screen
+# screen_duration = 4   ; all screens (1-7)
 # ---------------------------------------------------------------------------
 # Duration settings: wizard result takes priority over config.ini
-LOGO_DURATION    = _wizard_settings['logo_duration']
-SCREEN1_DURATION = _wizard_settings['screen_duration']
-SCREEN_DURATION  = _wizard_settings['screen_duration']
+LOGO_DURATION  = _wizard_settings['logo_duration']
+SCREEN_DURATION = _wizard_settings['screen_duration']
 BITCOIN_RPC_PASS = _cfg.get('BITCOIN', 'rpc_pass', fallback='moneyprintergobrrr')
 BITCOIN_RPC_HOST = _cfg.get('BITCOIN', 'rpc_host', fallback='127.0.0.1')
 BITCOIN_RPC_PORT = int(_cfg.get('BITCOIN', 'rpc_port', fallback='8332'))
@@ -768,7 +766,8 @@ def display_price_text(currency):
         display_icon(screen_buffer, images_path + 'Satoshi_regular_elipse.png', (33, 2), 27)
 
         price = get_btc_price(currency)
-        newPrice = str(price)
+        # Format price with thousands separator (e.g. 95,000,000 KRW or 95,000 USD)
+        newPrice = f"{price:,}" if price else "0"
         n = len(newPrice)
 
         # BTC price font size: original formula int(195/n)
@@ -782,8 +781,16 @@ def display_price_text(currency):
         cur_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 12)
         draw_right_justified_text(screen_buffer, currency, get_inverted_x(1, 12), 4, 270, cur_font)
 
-        # SAT value: same formula as BTC price but capped at price_font_size
-        sat_val = str(int(100_000_000 / price)) if price else "0"
+        # SAT value: sats per 1 unit of currency
+        # If < 1 sat (e.g. KRW), show up to 2 decimal places; otherwise show integer
+        if price:
+            raw_sat = 100_000_000 / price
+            if raw_sat < 1:
+                sat_val = f"{raw_sat:.2f}"
+            else:
+                sat_val = str(int(raw_sat))
+        else:
+            sat_val = "0"
         n2 = len(sat_val)
         sat_font_size = min(int(195 / n2) if n2 > 0 else 12, price_font_size)
         sat_font2 = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", sat_font_size)
@@ -1109,7 +1116,7 @@ while True:
         if "Screen1" in userScreenChoices:
             draw_screen1(currency)
             lcd_display_dissolve(screen_buffer)
-            time.sleep(SCREEN1_DURATION)
+            time.sleep(SCREEN_DURATION)
     except Exception as e:
         print("Error showing screen1;", str(e))
 
