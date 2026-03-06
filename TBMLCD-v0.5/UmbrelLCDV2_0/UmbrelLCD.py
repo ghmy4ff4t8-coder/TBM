@@ -1,7 +1,7 @@
 
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.26.0 (Umbrel 1.x compatible fork)
+#   Version  : 2.27.0 (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
 #    # v2.24.0: Screen transition default changed to 3s. Screen2 bottom numbers right-aligned.
@@ -375,8 +375,27 @@ def make_text_image(text, font, fill=(255, 255, 255)):
         w, h = tmp_draw.textsize(text, font=font)
         x_off, y_off = 0, 0
     # Add a small margin to avoid clipping at the bottom
+    # h_margin can be overridden per-call via make_text_image_no_margin()
     h_margin = max(4, int(h * 0.15))
     img = Image.new('RGBA', (max(w, 1), max(h + h_margin, 1)), (0, 0, 0, 0))
+    ImageDraw.Draw(img).text((x_off, y_off), text, font=font, fill=fill)
+    return img
+
+
+def make_text_image_no_margin(text, font, fill=(255, 255, 255)):
+    """Same as make_text_image but with h_margin=0 (text flush to bottom edge)."""
+    tmp = Image.new('RGBA', (1, 1))
+    tmp_draw = ImageDraw.Draw(tmp)
+    try:
+        bbox = tmp_draw.textbbox((0, 0), text, font=font)
+        x_off = -bbox[0]
+        y_off = -bbox[1]
+        w = bbox[2] - bbox[0]
+        h = bbox[3] - bbox[1]
+    except AttributeError:
+        w, h = tmp_draw.textsize(text, font=font)
+        x_off, y_off = 0, 0
+    img = Image.new('RGBA', (max(w, 1), max(h, 1)), (0, 0, 0, 0))
     ImageDraw.Draw(img).text((x_off, y_off), text, font=font, fill=fill)
     return img
 
@@ -846,9 +865,9 @@ def display_price_text(currency):
         price_x = get_corrected_x_position(39, price_font_size, 69)
         draw_left_justified_text(screen_buffer, newPrice, price_x, 36, 270, price_font)
 
-        # Currency label: 12px, right-justified
+        # Currency label: 12px, left-justified (top-right corner of landscape view)
         cur_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 12)
-        draw_right_justified_text(screen_buffer, currency, get_inverted_x(1, 12), 4, 270, cur_font)
+        draw_left_justified_text(screen_buffer, currency, 113, 4, 270, cur_font)
 
         # SAT value: same formula as BTC price but capped at price_font_size
         sat_val = str(int(100_000_000 / price)) if price else "0"
@@ -859,12 +878,15 @@ def display_price_text(currency):
         sat_x = get_corrected_x_position(39, sat_font_size, 27)
         draw_left_justified_text(screen_buffer, sat_val, sat_x, 36, 270, sat_font2)
 
-        # SATS/USD + temperature on the SAME line: combine into one string
-        # Font size matches currency label (12px). Placed at very bottom of screen (x=2).
+        # SATS/USD + temperature: right-justified, flush to bottom (h_margin=0, x=0)
         temperature = get_temperature()
         sats_msg = "SATS / " + currency + "   " + temperature + " "
         bottom_label_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 12)
-        draw_left_justified_text(screen_buffer, sats_msg, 2, 47, 270, bottom_label_font)
+        textimage = make_text_image_no_margin(sats_msg, bottom_label_font)
+        rotated = textimage.rotate(270, expand=1)
+        H = 160
+        w, _ = textimage.size
+        screen_buffer.paste(rotated, (0, int((H - w) - 4)), rotated)
     except Exception as e:
         print("Error creating price text;", str(e))
 
@@ -1143,7 +1165,7 @@ def draw_screen7():
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
-print('Running Umbrel LCD script - Version: 2.26.0 (Umbrel 1.x compatible)')
+print('Running Umbrel LCD script - Version: 2.27.0 (Umbrel 1.x compatible)')
 
 # Display umbrel logo on startup (duration configurable in config.ini)
 display_background_image('umbrel_logo.png')
