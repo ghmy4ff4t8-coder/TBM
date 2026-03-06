@@ -1,7 +1,7 @@
 
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.31.0 (Umbrel 1.x compatible fork)
+#   Version  : 2.32.0 (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
 #    # v2.24.0: Screen transition default changed to 3s. Screen2 bottom numbers right-aligned.
@@ -269,7 +269,7 @@ def lcd_display(image):
 # Previous frame buffer for dissolve effect
 _prev_buffer = None
 
-def lcd_display_dissolve(image, steps=6):
+def lcd_display_dissolve(image, steps=8):
     """Display image with a dissolve (cross-fade) transition from the previous frame.
     steps: number of blend frames (6 = ~0.3s on RPi at typical SPI speed).
     """
@@ -902,7 +902,7 @@ def display_price_text(currency):
 
         # SATS/USD + temperature: right-justified, flush to bottom (h_margin=0, x=0)
         temperature = get_temperature()
-        sats_msg = "SATS / " + currency + "   " + temperature + " "
+        sats_msg = "SATS / " + currency + "        " + temperature + " "
         bottom_label_font = ImageFont.truetype(poppins_fonts_path + "Poppins-Bold.ttf", 12)
         textimage = make_text_image_no_margin(sats_msg, bottom_label_font)
         rotated = textimage.rotate(270, expand=1)
@@ -1179,7 +1179,7 @@ def draw_screen7():
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
-print('Running Umbrel LCD script - Version: 2.31.0 (Umbrel 1.x compatible)')
+print('Running Umbrel LCD script - Version: 2.32.0 (Umbrel 1.x compatible)')
 
 # Display umbrel logo on startup (duration configurable in config.ini)
 display_background_image('umbrel_logo.png')
