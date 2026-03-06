@@ -173,7 +173,20 @@ def _get(cfg, section, key, fallback):
 # ---------------------------------------------------------------------------
 
 def _menu_currency(cfg):
-    val = input('Enter currency code (e.g. USD, EUR, KRW, JPY, GBP): ').strip().upper()
+    print()
+    print('  Supported currencies:')
+    currencies = [
+        'AED', 'ARS', 'AUD', 'BDT', 'BHD', 'BMD', 'BRL', 'CAD', 'CHF', 'CLP',
+        'CNY', 'CZK', 'DKK', 'EUR', 'GBP', 'GEL', 'HKD', 'HUF', 'IDR', 'ILS',
+        'INR', 'JPY', 'KRW', 'KWD', 'LKR', 'MMK', 'MXN', 'MYR', 'NGN', 'NOK',
+        'NZD', 'PHP', 'PKR', 'PLN', 'RUB', 'SAR', 'SEK', 'SGD', 'THB', 'TRY',
+        'TWD', 'UAH', 'USD', 'VEF', 'VND', 'ZAR',
+    ]
+    # Print in rows of 10
+    for i in range(0, len(currencies), 10):
+        print('  ' + '  '.join(currencies[i:i+10]))
+    print()
+    val = input('  Enter currency code: ').strip().upper()
     if val:
         if 'USER' not in cfg:
             cfg['USER'] = {}

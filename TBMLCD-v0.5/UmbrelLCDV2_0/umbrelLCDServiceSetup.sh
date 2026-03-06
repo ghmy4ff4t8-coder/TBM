@@ -135,10 +135,17 @@ echo
 # ──────────────────────────────────────────────────────────────────────────────
 echo "--- [ 2/3 ] Currency ---"
 echo
+echo "  Supported currencies:"
+echo "  AED  ARS  AUD  BDT  BHD  BMD  BRL  CAD  CHF  CLP"
+echo "  CNY  CZK  DKK  EUR  GBP  GEL  HKD  HUF  IDR  ILS"
+echo "  INR  JPY  KRW  KWD  LKR  MMK  MXN  MYR  NGN  NOK"
+echo "  NZD  PHP  PKR  PLN  RUB  SAR  SEK  SGD  THB  TRY"
+echo "  TWD  UAH  USD  VEF  VND  ZAR"
+echo
 
 gettingCurrency=true
 while $gettingCurrency; do
-    read -rp "  Enter currency code (e.g. USD, KRW, EUR, JPY, GBP): " newCurrency
+    read -rp "  Enter currency code: " newCurrency
     newCurrency="${newCurrency^^}"
     validationResult=$(python3 ./CurrencyData.py "${newCurrency}")
     if [ "$validationResult" = "Valid" ]; then
