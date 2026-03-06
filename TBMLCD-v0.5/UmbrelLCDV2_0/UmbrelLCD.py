@@ -1,7 +1,7 @@
 
 #-------------------------------------------------------------------------------
 #   Copyright (c) 2022 DOIDO Technologies
-#   Version  : 2.24.0 (Umbrel 1.x compatible fork)
+#   Version  : 2.25.0 (Umbrel 1.x compatible fork)
 #   Location : github - forked & updated for Umbrel OS 1.x compatibility
 #   Changes  :
 #    # v2.24.0: Screen transition default changed to 3s. Screen2 bottom numbers right-aligned.
@@ -327,6 +327,7 @@ BITCOIN_RPC_PORT = int(_cfg.get('BITCOIN', 'rpc_port', fallback='8332'))
 # Add new names here if Umbrel changes container naming in a future update.
 BITCOIN_CONTAINER_NAMES = [
     _cfg.get('BITCOIN', 'container', fallback=''),   # user override in config.ini
+    "bitcoin_app_1",         # Umbrel 1.x confirmed container name
     "bitcoin_bitcoind_1",    # Umbrel 0.x docker-compose style
     "bitcoin-bitcoind-1",   # Umbrel 1.x alternative
     "app_bitcoind_1",        # Umbrel 1.x app store style
@@ -1150,7 +1151,7 @@ def draw_screen7():
 # ---------------------------------------------------------------------------
 # Main loop
 # ---------------------------------------------------------------------------
-print('Running Umbrel LCD script - Version: 2.24.0 (Umbrel 1.x compatible)')
+print('Running Umbrel LCD script - Version: 2.25.0 (Umbrel 1.x compatible)')
 
 # Display umbrel logo on startup (duration configurable in config.ini)
 display_background_image('umbrel_logo.png')
