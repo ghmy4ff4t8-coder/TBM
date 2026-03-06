@@ -191,7 +191,7 @@ cat > "${cwd}/config.ini" << CONFIGEOF
 #
 #  Edit this file to change settings without touching the code.
 #  After editing, restart the service to apply changes:
-#    sudo systemctl restart UmbrelST7735LCD
+#    sudo systemctl restart tbm
 #
 #  Alternatively, run the script manually to use the interactive
 #  setup wizard (10-second auto-start timeout).
@@ -253,7 +253,7 @@ echo " Creating LCD Service..."
 echo "======================================================================"
 echo
 
-sudo tee /lib/systemd/system/UmbrelST7735LCD.service > /dev/null << EOF
+sudo tee /lib/systemd/system/tbm.service > /dev/null << EOF
 [Unit]
 Description=Umbrel LCD Service
 After=multi-user.target docker.service
@@ -267,22 +267,22 @@ Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 ExecStart=/usr/bin/python3 ${cwd}/tbm.py
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=UmbrelST7735LCD
+SyslogIdentifier=tbm
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
-sudo chmod 644 /lib/systemd/system/UmbrelST7735LCD.service
+sudo chmod 644 /lib/systemd/system/tbm.service
 sudo systemctl daemon-reload
-sudo systemctl enable UmbrelST7735LCD.service
-sudo systemctl start UmbrelST7735LCD.service
+sudo systemctl enable tbm.service
+sudo systemctl start tbm.service
 
 echo
 echo -e "\e[1;32m✔ LCD Service setup complete!\e[0m"
 echo
-printf "  %-22s sudo journalctl -u UmbrelST7735LCD -f\n"                                   "Check logs:"
-printf "  %-22s sudo systemctl stop UmbrelST7735LCD\n"                                      "Stop service:"
-printf "  %-22s sudo systemctl restart UmbrelST7735LCD\n"                                   "Restart service:"
-printf "  %-22s sudo systemctl stop UmbrelST7735LCD && bash configure.sh\n"     "Re-run setup:"
+printf "  %-22s sudo journalctl -u tbm -f\n"                                   "Check logs:"
+printf "  %-22s sudo systemctl stop tbm\n"                                      "Stop service:"
+printf "  %-22s sudo systemctl restart tbm\n"                                   "Restart service:"
+printf "  %-22s sudo systemctl stop tbm && bash configure.sh\n"     "Re-run setup:"
 echo

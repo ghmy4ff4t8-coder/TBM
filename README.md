@@ -95,19 +95,19 @@ That's it! Your LCD should now be running.
 
 *   **Check Logs:**
     ```bash
-    sudo journalctl -u UmbrelST7735LCD -f
+    sudo journalctl -u tbm -f
     ```
 *   **Restart Service:**
     ```bash
-    sudo systemctl restart UmbrelST7735LCD
+    sudo systemctl restart tbm
     ```
 *   **Stop Service:**
     ```bash
-    sudo systemctl stop UmbrelST7735LCD
+    sudo systemctl stop tbm
     ```
 *   **Re-run Setup Wizard:**
     ```bash
-    sudo systemctl stop UmbrelST7735LCD && bash ~/TBM/app/configure.sh
+    sudo systemctl stop tbm && bash ~/TBM/app/configure.sh
     ```
 
 ## Updating
@@ -117,7 +117,7 @@ cd ~/TBM
 git stash
 git pull
 git stash drop
-sudo systemctl restart UmbrelST7735LCD
+sudo systemctl restart tbm
 ```
 
 ## Uninstallation
@@ -144,7 +144,7 @@ bash uninstall.sh
 
 ## Troubleshooting
 
-*   **White Screen:** Check your GPIO wiring. Also verify the service is running with `sudo systemctl status UmbrelST7735LCD`.
+*   **White Screen:** Check your GPIO wiring. Also verify the service is running with `sudo systemctl status tbm`.
 *   **Garbled/Stripey Display:** This fork includes a bundled ST7735 driver (`st7735_tbm.py`) tuned for the TBM 1.8" panel. If issues persist, it may be a hardware problem.
 *   **`config.ini` Conflicts on `git pull`:** Use `git stash` before pulling (see Updating section above).
 

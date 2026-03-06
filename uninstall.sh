@@ -24,15 +24,15 @@ echo "			4. RoninDojo"
 echo
 
 # Check umbrel service
-STATUS="$(systemctl is-active UmbrelST7735LCD.service)"
+STATUS="$(systemctl is-active tbm.service)"
 if [ "${STATUS}" = "active" ]; then
-    echo "Uninstalling UmbrelST7735LCD.service"
-    sudo systemctl stop UmbrelST7735LCD.service
-    sudo systemctl disable UmbrelST7735LCD.service
-    sudo rm /lib/systemd/system/UmbrelST7735LCD.service
+    echo "Uninstalling tbm.service"
+    sudo systemctl stop tbm.service
+    sudo systemctl disable tbm.service
+    sudo rm /lib/systemd/system/tbm.service
     sudo systemctl daemon-reload
 else 
-    echo "UmbrelST7735LCD.service not running."   
+    echo "tbm.service not running."   
 fi
 
 # Check Raspiblitz service
